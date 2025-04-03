@@ -1,0 +1,77 @@
+# HTTP API Test Configuration
+# Contains all HTTP-based test configurations
+
+defaults:
+  baseUrl: "https://test-api.k6.io"
+  threads: 1
+  iterations: 1
+  connectTimeout: 5000
+  responseTimeout: 10000
+  follow_redirects: true
+  default_method: "GET"
+  default_content_type: "application/json"
+  default_charset: "UTF-8"
+  connect_timeout: 5000
+  response_timeout: 10000
+
+tests:
+  # Simple GET requests
+  - name: "Get all crocodiles"
+    endpoint: "/public/crocodiles/"
+    method: "GET"
+    expected_status: 200
+    assertions:
+      "$[0].id": "*"
+      "$[0].name": "*"
+      "$[0].sex": "*"
+
+  - name: "Get crocodile by ID"
+    endpoint: "/public/crocodiles/{{ crocodileId }}/"
+    method: "GET"
+    variables:
+      crocodileId: 1
+    expected_status: 200
+    assertions:
+      "$.id": "{{ crocodileId }}"
+      "$.name": "*"
+      "$.sex": "*"
+
+  # POST request with JSON body
+  - name: "Create new crocodile"
+    endpoint: "/public/crocodiles/"
+    method: "POST"
+    body_template: "http/create_crocodile.json"
+    variables:
+      name: "{{ faker.name.firstName() }}"
+      sex: "{{ random('M', 'F') }}"
+      dateOfBirth: "{{ dateFormat(faker.date.past(), 'YYYY-MM-DD') }}"
+    headers:
+      "Content-Type": "application/json"
+    expected_status: 201
+    assertions:
+      "$.name": "*"
+      "$.id": "*"
+
+# In future, we can add more k6 API tests here
+auth_tests:
+  # Authentication tests
+  service_url: "https://test-api.k6.io"
+  
+  tests:
+    - name: "User login"
+      endpoint: "/auth/token/login/"
+      method: "POST"
+      body: |
+        {
+          "username": "{{ username }}",
+          "password": "{{ password }}"
+        }
+      variables:
+        username: "user@example.com"
+        password: "password123"
+      headers:
+        "Content-Type": "application/json"
+      expected_status: 200
+      assertions:
+        "$.access": "*"
+        "$.refresh": "*"

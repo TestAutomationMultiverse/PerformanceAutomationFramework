@@ -1,0 +1,70 @@
+# GraphQL API Test Configuration
+# Contains all GraphQL-based test configurations
+
+defaults:
+  baseUrl: "https://test-api.k6.io/graphql"
+  threads: 1
+  iterations: 1
+  connectTimeout: 5000
+  responseTimeout: 10000
+  follow_redirects: true
+  default_method: "POST"
+  default_content_type: "application/json"
+  default_charset: "UTF-8"
+  connect_timeout: 5000
+  response_timeout: 10000
+  operation_name_field: "operationName"
+  query_field: "query"
+  variables_field: "variables"
+
+k6_tests:
+  # Tests for k6 GraphQL API
+  service_url: "https://test-api.k6.io/graphql"
+  
+  tests:
+    # Simple GraphQL query test
+    - name: "K6 GraphQL Crocodiles Test"
+      query_template: "graphql/get_crocodiles.graphql"
+      expected_status: 200
+      assertions:
+        "$.data.getCrocodiles": "*"
+        "$.data.getCrocodiles[0].id": "*"
+
+    # GraphQL query with variables
+    - name: "K6 GraphQL Crocodile By ID Test"
+      query_template: "graphql/get_crocodile_by_id.graphql"
+      operation_name: "getCrocodileById"
+      graphql_variables:
+        id: 1
+      expected_status: 200
+      assertions:
+        "$.data.getCrocodileById.id": "1"
+
+    # GraphQL with template processing
+    - name: "K6 GraphQL Crocodiles Template Test"
+      query_template: "graphql/get_entity.graphql"
+      variables:
+        entityType: "Crocodiles"
+        fields: "id name age sex"
+      expected_status: 200
+      assertions:
+        "$.data.getCrocodiles[0].id": "*"
+
+# In future, we can add other GraphQL API tests here using the same structure
+custom_graphql_tests:
+  # Custom GraphQL tests for other services
+  service_url: "https://your-graphql-service.example/graphql"
+  
+  tests:
+    - name: "Example GraphQL Test" 
+      query: |
+        query {
+          exampleQuery {
+            id
+            name
+          }
+        }
+      expected_status: 200
+      enabled: false  # Not active yet
+      assertions:
+        "$.data.exampleQuery": "*"

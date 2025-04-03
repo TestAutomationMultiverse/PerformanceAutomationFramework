@@ -1,0 +1,47 @@
+{
+    "name": "Performance Testing Framework",
+    "description": "Development environment for the Performance Testing Framework with Java 17, Node.js 20, Maven, JMeter, and SonarQube support",
+    "dockerFile": "Dockerfile",
+    "postCreateCommand": "bash .devcontainer/post-create.sh",
+    "features": {
+        "ghcr.io/devcontainers/features/java:1": {
+            "version": "17",
+            "installMaven": "true",
+            "mavenVersion": "3.9.5"
+        },
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "20",
+            "nodeGypDependencies": true
+        },
+        "ghcr.io/devcontainers/features/git:1": {
+            "version": "latest"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "vscjava.vscode-java-pack",
+                "redhat.vscode-xml",
+                "vscjava.vscode-maven",
+                "ms-azuretools.vscode-docker",
+                "sonarsource.sonarlint-vscode",
+                "github.vscode-github-actions",
+                "eamodio.gitlens",
+                "HongYan.maven-cleaner"
+            ],
+            "settings": {
+                "java.configuration.updateBuildConfiguration": "automatic",
+                "java.compile.nullAnalysis.mode": "automatic",
+                "editor.formatOnSave": true,
+                "files.autoSave": "afterDelay",
+                "terminal.integrated.defaultProfile.linux": "bash"
+            }
+        }
+    },
+    "remoteUser": "vscode",
+    "forwardPorts": [8080],
+    "hostRequirements": {
+        "memory": "8gb",
+        "cpus": 4
+    }
+}

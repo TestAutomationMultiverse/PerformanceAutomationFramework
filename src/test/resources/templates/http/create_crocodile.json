@@ -1,0 +1,5 @@
+{
+  "name": "{{ name }}",
+  "sex": "{{ sex }}",
+  "date_of_birth": "{{ dateOfBirth }}"
+}

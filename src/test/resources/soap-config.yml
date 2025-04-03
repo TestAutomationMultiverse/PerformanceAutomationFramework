@@ -1,0 +1,114 @@
+# SOAP API Test Configuration
+# Contains all SOAP/XML-based test configurations
+
+defaults:
+  threads: 1
+  iterations: 1
+  http_method: "POST"
+  default_soap_version: "1.1"
+  content_type_11: "text/xml;charset=UTF-8"
+  content_type_12: "application/soap+xml;charset=UTF-8"
+  envelope_11: |
+    <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+      <soap:Body>
+        $PAYLOAD$
+      </soap:Body>
+    </soap:Envelope>
+  envelope_12: |
+    <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+      <soap:Body>
+        $PAYLOAD$
+      </soap:Body>
+    </soap:Envelope>
+  follow_redirects: true
+  connect_timeout: 5000
+  response_timeout: 10000
+  default_charset: "UTF-8"
+
+calculator_tests:
+  service_url: "http://www.dneonline.com/calculator.asmx"
+  
+  tests:
+    - name: "Calculator SOAP Add Test"
+      soap_action: "http://tempuri.org/Add"
+      soap_version: "1.1"
+      payload_template: "soap/calculator_add.xml"
+      variables:
+        intA: 5
+        intB: 10
+      expected_status: 200
+      assertions:
+        "//*[local-name()='AddResult']": "15"
+
+    - name: "Calculator SOAP Multiply Test"
+      soap_action: "http://tempuri.org/Multiply"
+      soap_version: "1.1"
+      payload_template: "soap/calculator_operation.xml"
+      variables:
+        operationName: "Multiply"
+        param1Name: "intA"
+        param2Name: "intB"
+        value1: 6
+        value2: 7
+      expected_status: 200
+      assertions:
+        "//*[local-name()='MultiplyResult']": "42"
+
+country_info_tests:
+  service_url: "http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso"
+  
+  tests:
+    - name: "Country Name Test"
+      soap_action: "http://www.oorsprong.org/websamples.countryinfo/CountryName"
+      soap_version: "1.1"
+      payload_template: "soap/country_name.xml"
+      variables:
+        countryCode: "US"
+      expected_status: 200
+      assertions:
+        "//*[local-name()='CountryNameResult']": "United States"
+
+    - name: "Country Currency Test"
+      soap_action: "http://www.oorsprong.org/websamples.countryinfo/CountryCurrency"
+      soap_version: "1.1"
+      payload_template: "soap/country_currency.xml"
+      variables:
+        countryCode: "GB"
+      expected_status: 200
+      assertions:
+        "//*[local-name()='sISOCode']": "GBP"
+        "//*[local-name()='sName']": "Pound"
+
+    - name: "Capital City Test"
+      soap_action: "http://www.oorsprong.org/websamples.countryinfo/CapitalCity"
+      soap_version: "1.1"
+      payload_template: "soap/capital_city.xml"
+      variables:
+        countryCode: "FR"
+      expected_status: 200
+      assertions:
+        "//*[local-name()='CapitalCityResult']": "Paris"
+
+number_conversion_tests:
+  service_url: "https://www.dataaccess.com/webservicesserver/NumberConversion.wso"
+  
+  tests:
+    - name: "Number To Words Test"
+      soap_action: "https://www.dataaccess.com/webservicesserver/NumberToWords"
+      soap_version: "1.1"
+      payload_template: "soap/number_to_words.xml"
+      variables:
+        number: 42
+      expected_status: 200
+      assertions:
+        "//m:NumberToWordsResult/text()": "*"
+
+    - name: "Number To Dollars Test"
+      soap_action: "https://www.dataaccess.com/webservicesserver/NumberToDollars"
+      soap_version: "1.1"
+      payload_template: "soap/number_to_dollars.xml"
+      variables:
+        amount: 99.99
+      expected_status: 200
+      assertions:
+        "//m:NumberToDollarsResult/text()": "*"
