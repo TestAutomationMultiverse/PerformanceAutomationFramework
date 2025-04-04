@@ -1,110 +1,117 @@
 package io.perftest.examples;
 
+import io.perftest.components.graphql.GraphQLComponent;
 import io.perftest.core.BaseTest;
-import io.perftest.core.util.YamlConfigLoader;
+import io.perftest.engine.TestEngine;
 import io.perftest.entities.request.GraphQLRequestEntity;
+import io.perftest.systems.TestSystem;
+import io.perftest.util.YamlConfigLoader;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import us.abstracta.jmeter.javadsl.core.TestPlanStats;
 
-import java.util.List;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 
 /**
- * Example of GraphQL tests configured via YAML files
+ * Example test that loads GraphQL test configuration from YAML
  */
 public class GraphQLYamlConfigTest extends BaseTest {
     private static final Logger logger = LoggerFactory.getLogger(GraphQLYamlConfigTest.class);
+    private static final String CONFIG_FILE = "graphql-config.yml";
 
-    /**
-     * Test GraphQL requests defined in YAML configuration
-     */
+    @BeforeEach
+    public void setup() throws IOException {
+        // Create the HTML reports directory if it doesn't exist
+        Path htmlReportDir = Paths.get("target", "html-reports", "graphql");
+        Files.createDirectories(htmlReportDir);
+    }
+
     @Test
-    public void testGraphQLFromYamlConfig() throws Exception {
-        logger.info("Starting test: testGraphQLFromYamlConfig");
+    public void testGraphQLWithYamlConfig() throws IOException {
+        // Load configuration from YAML file
+        Map<String, Object> config = YamlConfigLoader.loadConfig(CONFIG_FILE);
         
-        // Get default test parameters from config
-        Map<String, Object> defaults = getProtocolDefaults("graphql");
-        int threads = getIntValue(defaults.getOrDefault("threads", 1));
-        int iterations = getIntValue(defaults.getOrDefault("iterations", 1));
+        // Create test system with GraphQL component
+        TestSystem testSystem = new TestSystem();
+        testSystem.addComponent(GraphQLRequestEntity.class, new GraphQLComponent());
         
-        // Load GraphQL request configurations from YAML
-        List<Map<String, Object>> graphqlConfigs = YamlConfigLoader.loadYamlDocuments("graphql/k6-graphql-test.yml");
-        logger.info("Loaded {} GraphQL test configurations from YAML", graphqlConfigs.size());
+        // Configure test engine from YAML
+        TestEngine engine = configureTestEngine(testSystem, config);
         
-        // Execute each GraphQL request
-        for (Map<String, Object> config : graphqlConfigs) {
-            // Create GraphQL request entity from configuration
-            GraphQLRequestEntity graphqlRequest = createGraphQLRequestFromConfig(config);
-            
-            // Execute the GraphQL test
-            logger.info("Executing GraphQL test: {}", config.get("name"));
-            executeGraphQLTest(graphqlRequest, threads, iterations);
-        }
+        // Set the protocol name to 'graphql' for generating the report
+        engine.setProtocolName("graphql");
+        
+        // Create and configure GraphQL request entity from YAML
+        GraphQLRequestEntity graphQLRequest = createGraphQLRequestEntity(config);
+        engine.addRequest(graphQLRequest);
+        
+        // Run the test
+        TestPlanStats stats = engine.run();
+        
+        // Log test results
+        logTestResults(stats);
     }
     
-    /**
-     * Create a GraphQLRequestEntity from a YAML configuration map
-     * @param config YAML configuration map
-     * @return GraphQLRequestEntity configured from YAML
-     */
-    private GraphQLRequestEntity createGraphQLRequestFromConfig(Map<String, Object> config) {
-        // Create GraphQL request entity with URL
-        GraphQLRequestEntity graphqlRequest = new GraphQLRequestEntity((String) config.get("url"));
+    private GraphQLRequestEntity createGraphQLRequestEntity(Map<String, Object> config) {
+        Map<String, Object> requestConfig = (Map<String, Object>) config.getOrDefault("request", Map.of());
+        String name = (String) requestConfig.getOrDefault("name", "GraphQL Request");
+        String endpoint = (String) requestConfig.getOrDefault("endpoint", "https://example.com/graphql");
         
-        // Set name
-        if (config.containsKey("name")) {
-            graphqlRequest.setName((String) config.get("name"));
-        }
-        
-        // Set query
-        if (config.containsKey("query")) {
-            graphqlRequest.setQuery((String) config.get("query"));
-        }
-        
-        // Set operation name
-        if (config.containsKey("operationName")) {
-            graphqlRequest.setOperationName((String) config.get("operationName"));
-        }
-        
-        // Set expected status
-        if (config.containsKey("expectedStatus")) {
-            int status = ((Integer) config.get("expectedStatus")).intValue();
-            graphqlRequest.setExpectedStatus(status);
-        }
-        
-        // Add headers if defined
-        if (config.containsKey("headers")) {
-            Map<String, String> headers = (Map<String, String>) config.get("headers");
-            for (Map.Entry<String, String> header : headers.entrySet()) {
-                graphqlRequest.addHeader(header.getKey(), header.getValue());
+        // Try to load query from template first, if not found use the inline query from config
+        String query = null;
+        String queryPath = YamlConfigLoader.getTemplatePath(config, "queryPath");
+        if (queryPath != null) {
+            try {
+                query = YamlConfigLoader.loadTemplateContent(queryPath);
+                logger.info("Loaded GraphQL query from template: {}", queryPath);
+            } catch (IOException e) {
+                logger.warn("Failed to load GraphQL query template, falling back to inline query: {}", e.getMessage());
             }
         }
         
-        // Add GraphQL variables
-        if (config.containsKey("graphQLVariables")) {
-            Map<String, Object> graphQLVariables = (Map<String, Object>) config.get("graphQLVariables");
-            for (Map.Entry<String, Object> var : graphQLVariables.entrySet()) {
-                graphqlRequest.addGraphQLVariable(var.getKey(), var.getValue());
+        // If template loading failed, use inline query from config
+        if (query == null) {
+            query = (String) requestConfig.getOrDefault("query", "query { example }");
+        }
+        
+        // Create entity with the URL and then set the other properties
+        GraphQLRequestEntity entity = new GraphQLRequestEntity(endpoint);
+        entity.setName(name);
+        entity.setQuery(query);
+        
+        // Set variables if present
+        if (requestConfig.containsKey("variables")) {
+            String variables = (String) requestConfig.get("variables");
+            entity.setVariables(variables);
+        }
+        
+        // Try to load headers from template first, if not found use the inline headers from config
+        String headersPath = YamlConfigLoader.getTemplatePath(config, "headersPath");
+        if (headersPath != null) {
+            try {
+                String headersJson = YamlConfigLoader.loadTemplateContent(headersPath);
+                // In a real implementation, you would parse the JSON and add headers to the entity
+                logger.info("Loaded headers from template: {}", headersPath);
+                // This is just a placeholder - in a real implementation you would need to parse the JSON
+                entity.addHeader("Content-Type", "application/json");
+            } catch (IOException e) {
+                logger.warn("Failed to load headers template, falling back to inline headers: {}", e.getMessage());
+            }
+        } else if (requestConfig.containsKey("headers")) {
+            // Set headers from inline config
+            @SuppressWarnings("unchecked")
+            Map<String, Object> headers = (Map<String, Object>) requestConfig.get("headers");
+            for (Map.Entry<String, Object> header : headers.entrySet()) {
+                entity.addHeader(header.getKey(), header.getValue().toString());
             }
         }
         
-        // Add template variables if defined
-        if (config.containsKey("variables")) {
-            Map<String, Object> variables = (Map<String, Object>) config.get("variables");
-            for (Map.Entry<String, Object> var : variables.entrySet()) {
-                graphqlRequest.addVariable(var.getKey(), var.getValue());
-            }
-        }
-        
-        // Add assertions
-        if (config.containsKey("assertions")) {
-            Map<String, String> assertions = (Map<String, String>) config.get("assertions");
-            for (Map.Entry<String, String> assertion : assertions.entrySet()) {
-                graphqlRequest.addAssertion(assertion.getKey(), assertion.getValue());
-            }
-        }
-        
-        return graphqlRequest;
+        return entity;
     }
 }

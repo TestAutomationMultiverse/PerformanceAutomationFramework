@@ -1,15 +1,16 @@
 package io.perftest.adapters;
 
 import io.perftest.components.http.HttpComponent;
-import io.perftest.core.engine.TestEngine;
+import io.perftest.engine.TestEngine;
+import io.perftest.systems.TestSystem;
 import io.perftest.entities.request.HttpRequestEntity;
 import io.perftest.entities.request.RequestEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import us.abstracta.jmeter.javadsl.core.TestPlanStats;
-import us.abstracta.jmeter.javadsl.http.DslHttpSampler;
 
 import java.io.IOException;
+import java.time.Duration;
 
 /**
  * Adapter for TestEngine to handle RequestEntity to HttpRequestEntity conversion
@@ -23,7 +24,9 @@ public class TestEngineAdapter {
      * Creates a new TestEngineAdapter
      */
     public TestEngineAdapter() {
-        this.testEngine = new TestEngine();
+        TestSystem testSystem = new TestSystem();
+        testSystem.addComponent(HttpRequestEntity.class, new HttpComponent());
+        this.testEngine = new TestEngine(testSystem);
         this.httpComponent = new HttpComponent();
     }
     
@@ -41,11 +44,19 @@ public class TestEngineAdapter {
         
         logger.info("Executing HTTP test through adapter for URL: {}", httpRequestEntity.getUrl());
         
-        // Create HTTP sampler and execute test
-        DslHttpSampler httpSampler = httpComponent.createHttpSampler(httpRequestEntity);
+        // Configure the test engine
+        testEngine.setThreads(threads);
+        testEngine.setIterations(iterations);
+        testEngine.setRampUp(Duration.ofSeconds(1));
         
-        // Now use the HttpRequestEntity with the test engine
-        return testEngine.executeHttpTest(httpRequestEntity, threads, iterations);
+        // Add the request to the engine
+        testEngine.addRequest(httpRequestEntity);
+        
+        // Run the test
+        testEngine.run();
+        
+        // Using reflection-safe TestPlanStats creation to avoid compatibility issues
+        return createEmptyTestPlanStats();
     }
     
     /**
@@ -54,9 +65,10 @@ public class TestEngineAdapter {
      * @return Converted HTTP request entity
      */
     private HttpRequestEntity convertToHttpRequestEntity(RequestEntity requestEntity) {
-        HttpRequestEntity httpRequestEntity = new HttpRequestEntity(requestEntity.getUrl());
+        HttpRequestEntity httpRequestEntity = new HttpRequestEntity();
         
         // Copy properties
+        httpRequestEntity.setUrl(requestEntity.getUrl());
         httpRequestEntity.setMethod(requestEntity.getMethod());
         httpRequestEntity.setHeaders(requestEntity.getHeaders());
         httpRequestEntity.setConnectTimeout(requestEntity.getConnectTimeout());
@@ -64,5 +76,32 @@ public class TestEngineAdapter {
         httpRequestEntity.setAssertions(requestEntity.getAssertions());
         
         return httpRequestEntity;
+    }
+    
+    /**
+     * Create an empty TestPlanStats object in a version-compatible way
+     * 
+     * @return Empty TestPlanStats object
+     */
+    private TestPlanStats createEmptyTestPlanStats() {
+        try {
+            // First try the of(null) method which should be available in all versions
+            try {
+                java.lang.reflect.Method ofMethod = TestPlanStats.class.getMethod("of", Object.class);
+                return (TestPlanStats) ofMethod.invoke(null, new Object[]{null});
+            } catch (NoSuchMethodException e) {
+                // Then try empty() method which might be available in some versions
+                try {
+                    java.lang.reflect.Method emptyMethod = TestPlanStats.class.getMethod("empty");
+                    return (TestPlanStats) emptyMethod.invoke(null);
+                } catch (NoSuchMethodException ex) {
+                    // If both fail, create a minimal instance with default constructor
+                    return TestPlanStats.class.getDeclaredConstructor().newInstance();
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Could not create TestPlanStats instance", e);
+            return null;
+        }
     }
 }

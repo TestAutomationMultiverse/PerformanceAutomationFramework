@@ -1,0 +1,24 @@
+# JDBC Performance Test Configuration
+
+protocol: jdbc
+
+execution:
+  threads: 2
+  iterations: 3
+  rampUpSeconds: 1
+  holdSeconds: 2
+
+connection:
+  url: "jdbc:h2:mem:testdb"
+  driver: "org.h2.Driver"
+  username: "sa"
+  password: ""
+  poolSize: 5
+
+request:
+  name: "User Query Test"
+  query: "SELECT * FROM users LIMIT 10"
+  params: []
+
+templates:
+  queryPath: "templates/jdbc/query/select_users.sql"

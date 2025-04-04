@@ -1,3 +1,0 @@
-<NumberToWords xmlns="https://www.dataaccess.com/webservicesserver/">
-  <ubiNum>{{ number }}</ubiNum>
-</NumberToWords>

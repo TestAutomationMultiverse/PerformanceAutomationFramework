@@ -11,6 +11,8 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     ca-certificates \
     gnupg \
     software-properties-common \
+    docker.io \
+    docker-compose \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

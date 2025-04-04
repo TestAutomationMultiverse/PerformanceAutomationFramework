@@ -1,8 +1,8 @@
 package io.perftest.entities.user;
 
-import io.perftest.core.data.DataGenerator;
-import io.perftest.core.entity.Entity;
-import io.perftest.core.logger.TestLogger;
+import io.perftest.data.DataGenerator;
+import io.perftest.entities.core.Entity;
+import io.perftest.util.logger.TestLogger;
 import org.slf4j.Logger;
 
 import java.util.HashMap;

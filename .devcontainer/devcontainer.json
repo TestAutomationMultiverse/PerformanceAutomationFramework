@@ -1,6 +1,6 @@
 {
     "name": "Performance Testing Framework",
-    "description": "Development environment for the Performance Testing Framework with Java 17, Node.js 20, Maven, JMeter, and SonarQube support",
+    "description": "Development environment for the Performance Testing Framework with Java 17, Node.js 20, Maven, JMeter, and SonarQube support with Docker Compose for Prometheus and Grafana",
     "dockerFile": "Dockerfile",
     "postCreateCommand": "bash .devcontainer/post-create.sh",
     "features": {
@@ -15,6 +15,11 @@
         },
         "ghcr.io/devcontainers/features/git:1": {
             "version": "latest"
+        },
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {
+            "version": "latest",
+            "moby": true,
+            "dockerDashComposeVersion": "v2"
         }
     },
     "customizations": {
@@ -39,9 +44,10 @@
         }
     },
     "remoteUser": "vscode",
-    "forwardPorts": [8080],
+    "forwardPorts": [8080, 9090, 3000, 9270],
     "hostRequirements": {
         "memory": "8gb",
         "cpus": 4
-    }
+    },
+    "runArgs": ["--init"]
 }

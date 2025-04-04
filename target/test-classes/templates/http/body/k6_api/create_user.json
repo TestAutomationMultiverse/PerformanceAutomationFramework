@@ -1,0 +1,7 @@
+{
+  "username": "testuser_{{uuid}}",
+  "password": "testPassword123",
+  "email": "test_{{random}}@example.com",
+  "first_name": "Test",
+  "last_name": "User"
+}

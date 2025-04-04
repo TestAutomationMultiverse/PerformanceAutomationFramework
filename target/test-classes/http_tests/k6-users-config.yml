@@ -1,0 +1,26 @@
+# K6 API Test - Users API (Protected)
+
+protocol: http
+
+execution:
+  threads: 3
+  iterations: 5
+  rampUpSeconds: 1
+  holdSeconds: 3
+
+request:
+  name: "K6 API - User Login"
+  endpoint: "https://test-api.k6.io/auth/token/login/"
+  method: "POST"
+  headers:
+    Content-Type: "application/json"
+    Accept: "application/json"
+  body: |
+    {
+      "username": "testuser",
+      "password": "testpassword"
+    }
+
+templates:
+  headersPath: "templates/http/headers/default_headers.json"
+  bodyPath: "templates/http/body/k6_api/create_user.json"

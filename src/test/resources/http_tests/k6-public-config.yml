@@ -1,0 +1,19 @@
+# K6 API Test - Public Endpoint
+
+protocol: http
+
+execution:
+  threads: 5
+  iterations: 10
+  rampUpSeconds: 2
+  holdSeconds: 5
+
+request:
+  name: "K6 API - Public Endpoint"
+  endpoint: "https://test-api.k6.io/public/crocodiles/1/"
+  method: "GET"
+  headers:
+    Accept: "application/json"
+
+templates:
+  headersPath: "templates/http/headers/default_headers.json"

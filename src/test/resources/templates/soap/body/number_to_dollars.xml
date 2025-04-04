@@ -1,0 +1,3 @@
+<NumberToDollars xmlns="https://www.dataaccess.com/webservicesserver/">
+  <dNum>{{ amount }}</dNum>
+</NumberToDollars>

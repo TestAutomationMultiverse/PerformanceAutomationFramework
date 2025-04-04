@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "properties": {
+    "resultSet": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "updateCount": {
+      "type": "integer"
+    }
+  }
+}
