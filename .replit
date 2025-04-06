@@ -1,0 +1,136 @@
+modules = ["java-17", "python-3.11"]
+
+[nix]
+channel = "stable-24_05"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Performance Framework CLI"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Build and Run Framework"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Build Config Manager Fix"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Run SpotBugs Check"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Check ConfigManager Issues"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Run HTML Demo"
+
+[[workflows.workflow]]
+name = "Performance Framework CLI"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "./perftest.sh help"
+
+[[workflows.workflow]]
+name = "Build and Run Framework"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "./perftest.sh build && echo \"Build completed\" && ./perftest.sh run html-demo"
+
+[[workflows.workflow]]
+name = "Build Config Manager Fix"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace && ./perftest.sh build"
+
+[[workflows.workflow]]
+name = "Run SpotBugs Check"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace && ./perftest.sh build | grep -A 3 -B 3 \"ConfigManager\""
+
+[[workflows.workflow]]
+name = "Check ConfigManager Issues"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace && ./perftest.sh build | grep \"ConfigManager\" || echo \"No ConfigManager issues found\""
+
+[[workflows.workflow]]
+name = "Run HTML Demo"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace && ./perftest.sh run html-demo"
+
+[deployment]
+run = ["sh", "-c", "sh run-html-report-demo.sh"]
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+# [workflows]
+
+# [deployment]
+# run = ["sh", "-c", "python repo_analyzer.py"]
+
+# [[ports]]
+# localPort = 5000
+# externalPort = 80

@@ -72,13 +72,6 @@ import us.abstracta.jmeter.javadsl.core.threadgroups.BaseThreadGroup.ThreadGroup
  * engine.addRequest(request);
  * TestPlanStats stats = engine.runTest();
  * }</pre>
- * 
- * <p>Updated to use the unified reporting structure that stores JTL files, HTML reports,
- * and logs in a consistent directory structure:
- * target/unified-reports/protocol_timestamp_uniqueId/
- *   - jtl files
- *   - html/ (contains HTML reports)
- *   - logs/ (contains log files)</p>
  */
 public class TestEngine {
     private static final Logger logger = LoggerFactory.getLogger(TestEngine.class);
@@ -88,9 +81,6 @@ public class TestEngine {
     private final Map<String, Path> resultPaths;
     private final Map<String, Path> htmlReportPaths;
     private final Map<String, Path> unifiedReportPaths;
-    
-    // Base directory for unified reporting structure
-    private static final String UNIFIED_REPORTS_BASE = "target/unified-reports";
     
     private int threads = 1;
     private int iterations = 1;
@@ -404,9 +394,6 @@ public class TestEngine {
      * <p>It handles setting up the result directories, configuring logging,
      * creating the JMeter test plan, and returning the test statistics.</p>
      * 
-     * <p>This method has been updated to work with the new unified reporting structure
-     * that stores JTL, HTML, and log files in a consistent directory layout.</p>
-     * 
      * @return TestPlanStats containing the results of the test execution
      * @throws IOException If there's an error creating result directories
      * @throws TestExecutionException If an error occurs during test setup or execution
@@ -419,20 +406,19 @@ public class TestEngine {
         logger.info("Starting test execution with {} threads, {} iterations, {} ramp-up",
                 threads, iterations, rampUp);
                 
-        // Configure JMeter logging for this specific test execution
-        // The JMeterLogConfiguration now creates a unified directory structure
-        String testLogFile = JMeterLogConfiguration.configureLogging(protocolName);
-        logger.info("JMeter logs will be written to: {}", testLogFile);
-        
-        // Get the unified directory path that was created by the log configuration
-        Path unifiedReportDir = JMeterLogConfiguration.getUnifiedReportDirectory();
-        
-        // Create results directories within the unified structure
-        ResultsDirectories resultDirs = createResultsDirectories(protocolName, unifiedReportDir);
+        // Create unified results directories
+        ResultsDirectories resultDirs = createResultsDirectories(protocolName);
         Path jtlPath = resultDirs.jtlPath;
         Path htmlPath = resultDirs.htmlPath;
+        Path unifiedDir = resultDirs.unifiedDir;
+        
+        // Configure JMeter logging for this specific test execution to use the unified directory
+        String testLogFile = JMeterLogConfiguration.configureLoggingToDirectory(protocolName, unifiedDir.toString());
+        logger.info("JMeter logs will be written to: {}", testLogFile);
+        
         logger.info("Test results will be written to: {}", jtlPath);
         logger.info("HTML reports will be generated at: {}", htmlPath);
+        logger.info("All test artifacts will be stored in: {}", unifiedDir);
         
         // Create thread group for the test with ThreadGroupChild[] samplers
         ThreadGroupChild[] samplers = generateSamplers();
@@ -446,194 +432,175 @@ public class TestEngine {
         );
         
         try {
-            // Run the test and return the statistics
+            logger.info("Executing test plan...");
             TestPlanStats stats = testPlan.run();
-            logger.info("Test execution completed successfully");
             
-            // Store the unified report directory path for reference
-            // Create a summary file to help navigate the unified structure
-            createReportSummary(unifiedReportDir, jtlPath, htmlPath);
+            logger.info("Test execution completed successfully");
+            logger.info("Total requests executed: {}", stats.overall().samplesCount());
+            logger.info("Total errors: {}", stats.overall().errorsCount());
+            logger.info("Average response time: {} ms", stats.overall().sampleTime().mean());
             
             return stats;
-        } catch (Exception e) {
-            logger.error("Test execution failed", e);
-            throw new TestExecutionException(ErrorCode.TEST_EXECUTION_ERROR, "Test execution failed", e);
+        } catch (IOException e) {
+            logger.error("Error executing test plan", e);
+            throw new TestExecutionException(ErrorCode.TEST_EXECUTION_ERROR, 
+                    "Error executing test plan: " + e.getMessage(), e);
         }
     }
     
     /**
-     * Creates a summary file within the unified report directory to help navigate
-     * between the different report files.
+     * Generate JMeter samplers for the test plan based on the added requests.
      * 
-     * @param unifiedDir The unified report directory
-     * @param jtlPath The path to the JTL file
-     * @param htmlPath The path to the HTML report directory
-     * @throws IOException If there's an error creating the summary file
-     */
-    private void createReportSummary(Path unifiedDir, Path jtlPath, Path htmlPath) throws IOException {
-        if (unifiedDir == null) {
-            logger.warn("Unable to create report summary: unified directory is null");
-            return;
-        }
-        
-        Path summaryPath = unifiedDir.resolve("summary.html");
-        
-        String dirName = unifiedDir.getFileName().toString();
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        
-        StringBuilder content = new StringBuilder();
-        content.append("<!DOCTYPE html>\n");
-        content.append("<html>\n");
-        content.append("<head>\n");
-        content.append("    <meta charset=\"UTF-8\">\n");
-        content.append("    <title>Unified Test Report Summary</title>\n");
-        content.append("    <style>\n");
-        content.append("        body { font-family: Arial, sans-serif; margin: 20px; }\n");
-        content.append("        h1 { color: #333366; }\n");
-        content.append("        h2 { color: #336699; margin-top: 20px; }\n");
-        content.append("        .info { margin: 20px 0; padding: 10px; background-color: #f0f0f0; border-radius: 5px; }\n");
-        content.append("        .info div { margin: 10px 0; }\n");
-        content.append("        .label { font-weight: bold; display: inline-block; width: 150px; }\n");
-        content.append("        .section { margin: 20px 0; padding: 10px; background-color: #f8f8f8; border-radius: 5px; }\n");
-        content.append("        .not-available { color: #999; font-style: italic; }\n");
-        content.append("        ul { margin-top: 5px; }\n");
-        content.append("    </style>\n");
-        content.append("</head>\n");
-        content.append("<body>\n");
-        content.append("    <h1>Unified Test Report Summary</h1>\n");
-        content.append("    <div class=\"info\">\n");
-        content.append("        <div><span class=\"label\">Test Directory:</span> ").append(dirName).append("</div>\n");
-        content.append("        <div><span class=\"label\">Protocol:</span> ").append(protocolName).append("</div>\n");
-        content.append("        <div><span class=\"label\">Generated:</span> ").append(timestamp).append("</div>\n");
-        content.append("    </div>\n");
-        
-        // Add JTL file section
-        content.append("    <div class=\"section\">\n");
-        content.append("        <h2>JTL Results</h2>\n");
-        if (jtlPath != null && Files.exists(jtlPath)) {
-            content.append("        <ul>\n");
-            content.append("            <li><a href=\"").append(jtlPath.getFileName()).append("\">")
-                    .append(jtlPath.getFileName()).append("</a></li>\n");
-            content.append("        </ul>\n");
-        } else {
-            content.append("        <p class=\"not-available\">No JTL results available</p>\n");
-        }
-        content.append("    </div>\n");
-        
-        // Add HTML report section
-        content.append("    <div class=\"section\">\n");
-        content.append("        <h2>HTML Reports</h2>\n");
-        if (htmlPath != null && Files.exists(htmlPath)) {
-            content.append("        <ul>\n");
-            Path indexPath = htmlPath.resolve("index.html");
-            if (Files.exists(indexPath)) {
-                content.append("            <li><a href=\"html/index.html\">HTML Report</a></li>\n");
-            } else {
-                content.append("            <li>HTML directory exists but no index.html found</li>\n");
-            }
-            content.append("        </ul>\n");
-        } else {
-            content.append("        <p class=\"not-available\">No HTML reports available</p>\n");
-        }
-        content.append("    </div>\n");
-        
-        // Add log files section
-        Path logsDir = unifiedDir.resolve("logs");
-        content.append("    <div class=\"section\">\n");
-        content.append("        <h2>Log Files</h2>\n");
-        if (Files.exists(logsDir) && Files.isDirectory(logsDir)) {
-            content.append("        <ul>\n");
-            try {
-                Files.list(logsDir)
-                        .filter(path -> path.toString().endsWith(".log"))
-                        .forEach(path -> content.append("            <li><a href=\"logs/").append(path.getFileName()).append("\">")
-                                .append(path.getFileName()).append("</a></li>\n"));
-            } catch (IOException e) {
-                content.append("            <li>Error listing log files: ").append(e.getMessage()).append("</li>\n");
-            }
-            content.append("        </ul>\n");
-        } else {
-            content.append("        <p class=\"not-available\">No log files available</p>\n");
-        }
-        content.append("    </div>\n");
-        
-        // Add test configuration section
-        content.append("    <div class=\"section\">\n");
-        content.append("        <h2>Test Configuration</h2>\n");
-        content.append("        <ul>\n");
-        content.append("            <li><span class=\"label\">Test Plan Name:</span> ").append(testPlanName).append("</li>\n");
-        content.append("            <li><span class=\"label\">Threads:</span> ").append(threads).append("</li>\n");
-        content.append("            <li><span class=\"label\">Iterations:</span> ").append(iterations).append("</li>\n");
-        content.append("            <li><span class=\"label\">Ramp-up:</span> ").append(rampUp).append("</li>\n");
-        content.append("            <li><span class=\"label\">Requests:</span> ").append(requests.size()).append("</li>\n");
-        content.append("        </ul>\n");
-        content.append("    </div>\n");
-        
-        content.append("</body>\n");
-        content.append("</html>\n");
-        
-        Files.writeString(summaryPath, content.toString());
-        logger.info("Created report summary at: {}", summaryPath);
-    }
-    
-    /**
-     * Generates JMeter samplers for all requests in the test plan.
+     * <p>This method processes all added requests, converting them to JMeter samplers
+     * using the appropriate component for each request type.</p>
      * 
-     * <p>This method processes each request entity using the appropriate component
-     * registered with the TestSystem, applying any modifiers before processing.</p>
-     * 
-     * @return Array of JMeter samplers for the test plan
+     * @return Array of ThreadGroupChild objects representing the JMeter samplers
      */
     private ThreadGroupChild[] generateSamplers() {
         List<ThreadGroupChild> samplers = new ArrayList<>();
         
         for (RequestEntity request : requests) {
-            // Apply modifiers based on request type
-            if (request instanceof HttpRequestEntity && httpModifier != null) {
-                httpModifier.accept((HttpRequestEntity) request);
-            } else if (request instanceof GraphQLRequestEntity && graphqlModifier != null) {
-                graphqlModifier.accept((GraphQLRequestEntity) request);
-            } else if (request instanceof XmlRequestEntity && xmlModifier != null) {
-                xmlModifier.accept((XmlRequestEntity) request);
-            } else if (request instanceof SoapRequestEntity && soapModifier != null) {
-                soapModifier.accept((SoapRequestEntity) request);
-            } else if (request instanceof JdbcRequestEntity && jdbcModifier != null) {
-                jdbcModifier.accept((JdbcRequestEntity) request);
-            }
-            
-            // Process the request with the TestSystem to generate the sampler
-            Result<BaseThreadGroup.ThreadGroupChild> result = testSystem.safeProcessRequest(request);
-            
-            if (result.isSuccess()) {
-                // Add the generated sampler to the list
-                samplers.add(result.getValue());
-            } else {
-                // Log the error but continue with other samplers
-                logger.error("Failed to process request: {} - {}", result.getErrorCode(), result.getErrorMessage());
+            if (request instanceof HttpRequestEntity) {
+                HttpRequestEntity httpRequest = (HttpRequestEntity) request;
+                
+                // Apply HTTP request modifier if specified
+                if (httpModifier != null) {
+                    httpModifier.accept(httpRequest);
+                }
+                
+                // Get the HTTP component
+                HttpComponent component = (HttpComponent) testSystem.getComponent(HttpRequestEntity.class);
+                if (component != null) {
+                    // Process the request entity and add sampler to the list
+                    Result<ThreadGroupChild> result = component.process(httpRequest);
+                    if (result.isSuccess()) {
+                        samplers.add(result.getValue());
+                    } else {
+                        logger.error("Error processing HTTP request: {}", result.getErrorMessage());
+                    }
+                }
+            } else if (request instanceof GraphQLRequestEntity) {
+                GraphQLRequestEntity graphQLRequest = (GraphQLRequestEntity) request;
+                
+                // Apply GraphQL request modifier if specified
+                if (graphqlModifier != null) {
+                    graphqlModifier.accept(graphQLRequest);
+                }
+                
+                // Get the GraphQL component
+                GraphQLComponent component = (GraphQLComponent) testSystem.getComponent(GraphQLRequestEntity.class);
+                if (component != null) {
+                    // Process the request entity and add sampler to the list
+                    Result<ThreadGroupChild> result = component.process(graphQLRequest);
+                    if (result.isSuccess()) {
+                        samplers.add(result.getValue());
+                    } else {
+                        logger.error("Error processing GraphQL request: {}", result.getErrorMessage());
+                    }
+                }
+            } else if (request instanceof XmlRequestEntity) {
+                XmlRequestEntity xmlRequest = (XmlRequestEntity) request;
+                
+                // Apply XML request modifier if specified
+                if (xmlModifier != null) {
+                    xmlModifier.accept(xmlRequest);
+                }
+                
+                // Get the XML component
+                XmlComponent component = (XmlComponent) testSystem.getComponent(XmlRequestEntity.class);
+                if (component != null) {
+                    // Process the request entity and add sampler to the list
+                    Result<ThreadGroupChild> result = component.process(xmlRequest);
+                    if (result.isSuccess()) {
+                        samplers.add(result.getValue());
+                    } else {
+                        logger.error("Error processing XML request: {}", result.getErrorMessage());
+                    }
+                }
+            } else if (request instanceof SoapRequestEntity) {
+                SoapRequestEntity soapRequest = (SoapRequestEntity) request;
+                
+                // Apply SOAP request modifier if specified
+                if (soapModifier != null) {
+                    soapModifier.accept(soapRequest);
+                }
+                
+                // Get the SOAP component
+                SoapComponent component = (SoapComponent) testSystem.getComponent(SoapRequestEntity.class);
+                if (component != null) {
+                    // Process the request entity and add sampler to the list
+                    Result<ThreadGroupChild> result = component.process(soapRequest);
+                    if (result.isSuccess()) {
+                        samplers.add(result.getValue());
+                    } else {
+                        logger.error("Error processing SOAP request: {}", result.getErrorMessage());
+                    }
+                }
+            } else if (request instanceof JdbcRequestEntity) {
+                JdbcRequestEntity jdbcRequest = (JdbcRequestEntity) request;
+                
+                // Apply JDBC request modifier if specified
+                if (jdbcModifier != null) {
+                    jdbcModifier.accept(jdbcRequest);
+                }
+                
+                // Get the JDBC component
+                JdbcComponent component = (JdbcComponent) testSystem.getComponent(JdbcRequestEntity.class);
+                if (component != null) {
+                    // Process the request entity and add sampler to the list
+                    Result<ThreadGroupChild> result = component.process(jdbcRequest);
+                    if (result.isSuccess()) {
+                        samplers.add(result.getValue());
+                    } else {
+                        logger.error("Error processing JDBC request: {}", result.getErrorMessage());
+                    }
+                }
             }
         }
         
-        // Convert the list to an array for the threadGroup method
         return samplers.toArray(new ThreadGroupChild[0]);
     }
     
     /**
-     * Creates the necessary directories for storing test results.
+     * Create directories for test results and HTML reports.
      * 
-     * <p>This method creates directories for JTL files and HTML reports
-     * using the new unified directory structure.</p>
+     * <p>This method creates the necessary directories for storing test results,
+     * including JTL files and HTML reports. It uses a standardized naming pattern
+     * to organize results by protocol and timestamp.</p>
      * 
-     * @param protocol Protocol name for directory naming
-     * @param unifiedReportDir The unified report directory to use (created by JMeterLogConfiguration)
+     * @param protocol The protocol name for which to create directories
      * @return A ResultsDirectories object containing the paths
-     * @throws IOException If directory creation fails
+     * @throws IOException If there's an error creating directories
      */
-    private ResultsDirectories createResultsDirectories(String protocol, Path unifiedReportDir) throws IOException {
-        // Create a JTL file path within the unified directory
-        Path jtlPath = unifiedReportDir.resolve(String.format("%s.jtl", protocol));
+    private ResultsDirectories createResultsDirectories(String protocol) throws IOException {
+        // Get timestamp for unique directory names
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        String uniqueId = UUID.randomUUID().toString().substring(0, 8);
+        
+        // Create a target directory if it doesn't exist
+        Path baseDir = Paths.get("target");
+        if (!Files.exists(baseDir)) {
+            Files.createDirectories(baseDir);
+        }
+        
+        // Create unified directory structure for all report files
+        Path unifiedReportsDir = baseDir.resolve("unified-reports");
+        if (!Files.exists(unifiedReportsDir)) {
+            Files.createDirectories(unifiedReportsDir);
+        }
+        
+        // Create protocol-specific directory with timestamp and unique ID
+        String reportDirName = String.format("%s_%s_%s", protocol, timestamp, uniqueId);
+        Path reportDir = unifiedReportsDir.resolve(reportDirName);
+        if (!Files.exists(reportDir)) {
+            Files.createDirectories(reportDir);
+        }
+        
+        // Create a unique JTL file path within the unified directory
+        Path jtlPath = reportDir.resolve(String.format("%s.jtl", protocol));
         
         // HTML reports will be in a subdirectory of the unified directory
-        Path htmlPath = unifiedReportDir.resolve("html");
+        Path htmlPath = reportDir.resolve("html");
         if (!Files.exists(htmlPath)) {
             Files.createDirectories(htmlPath);
         }
@@ -641,66 +608,65 @@ public class TestEngine {
         // Store the paths for later reference
         resultPaths.put(protocol, jtlPath);
         htmlReportPaths.put(protocol, htmlPath);
-        unifiedReportPaths.put(protocol, unifiedReportDir);
+        unifiedReportPaths.put(protocol, reportDir);
         
-        logger.info("Configured unified directory structure:");
-        logger.info("  Unified Directory: {}", unifiedReportDir);
-        logger.info("  JTL File: {}", jtlPath);
-        logger.info("  HTML Reports: {}", htmlPath);
-        logger.info("  Log Files: {}", unifiedReportDir.resolve("logs"));
+        // Also store the unified directory for reference
+        System.setProperty("perftest.current.report.dir", reportDir.toString());
         
-        return new ResultsDirectories(jtlPath, htmlPath);
+        return new ResultsDirectories(jtlPath, htmlPath, reportDir);
     }
     
     /**
-     * Get the path to the JTL results file for a protocol.
+     * Get the path to the JTL file for a specific protocol.
      * 
-     * <p>If you've run multiple tests with the same protocol, this will return
-     * the path for the most recent test.</p>
+     * <p>This method returns the path to the JTL file containing the test results
+     * for the specified protocol. It uses the path stored during test execution.</p>
      * 
-     * @param protocol The protocol name
-     * @return The path to the JTL file, or null if not found
+     * @param protocol The protocol for which to get the JTL file path
+     * @return The path to the JTL file, or null if not available
      */
     public Path getResultsPath(String protocol) {
         return resultPaths.get(protocol);
     }
     
     /**
-     * Get the path to the HTML report directory for a protocol.
+     * Get the path to the HTML report directory for a specific protocol.
      * 
-     * <p>If you've run multiple tests with the same protocol, this will return
-     * the path for the most recent test.</p>
+     * <p>This method returns the path to the directory containing the HTML reports
+     * for the specified protocol. It uses the path stored during test execution.</p>
      * 
-     * @param protocol The protocol name
-     * @return The path to the HTML report directory, or null if not found
+     * @param protocol The protocol for which to get the HTML report path
+     * @return The path to the HTML report directory, or null if not available
      */
     public Path getHtmlReportPath(String protocol) {
         return htmlReportPaths.get(protocol);
     }
     
     /**
-     * Get the path to the unified report directory for a protocol.
+     * Get the path to the unified report directory for a specific protocol.
      * 
-     * <p>If you've run multiple tests with the same protocol, this will return
-     * the path for the most recent test.</p>
+     * <p>This method returns the path to the unified directory containing all reports
+     * (JTL, HTML, logs) for the specified protocol.</p>
      * 
-     * @param protocol The protocol name
-     * @return The path to the unified report directory, or null if not found
+     * @param protocol The protocol for which to get the unified report directory
+     * @return The path to the unified report directory, or null if not available
      */
     public Path getUnifiedReportPath(String protocol) {
         return unifiedReportPaths.get(protocol);
     }
     
     /**
-     * Simple class to hold the paths for test results.
+     * Helper class to store paths to results directories.
      */
     private static class ResultsDirectories {
         final Path jtlPath;
         final Path htmlPath;
+        final Path unifiedDir;
         
-        ResultsDirectories(Path jtlPath, Path htmlPath) {
+        ResultsDirectories(Path jtlPath, Path htmlPath, Path unifiedDir) {
             this.jtlPath = jtlPath;
             this.htmlPath = htmlPath;
+            this.unifiedDir = unifiedDir;
         }
     }
 }

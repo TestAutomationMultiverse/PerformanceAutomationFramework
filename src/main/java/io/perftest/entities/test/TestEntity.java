@@ -1,7 +1,9 @@
 package io.perftest.entities.test;
 
 import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Collections;
 
 /**
  * Simplified TestEntity class that represents a performance test configuration
@@ -47,11 +49,16 @@ public class TestEntity {
     }
 
     public Map<String, Object> getVariables() {
-        return variables;
+        if (variables == null) return null;
+        return Collections.unmodifiableMap(variables);
     }
 
     public void setVariables(Map<String, Object> variables) {
-        this.variables = variables;
+        if (variables == null) {
+            this.variables = null;
+            return;
+        }
+        this.variables = new HashMap<>(variables);
     }
 
     public void addVariable(String key, Object value) {

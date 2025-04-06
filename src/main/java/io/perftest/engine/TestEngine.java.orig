@@ -32,7 +32,6 @@ import io.perftest.entities.request.RequestEntity;
 import io.perftest.entities.request.SoapRequestEntity;
 import io.perftest.entities.request.XmlRequestEntity;
 import io.perftest.exception.ErrorCode;
-import io.perftest.exception.ErrorHandler;
 import io.perftest.exception.Result;
 import io.perftest.exception.TestExecutionException;
 import io.perftest.systems.TestSystem;
@@ -72,13 +71,6 @@ import us.abstracta.jmeter.javadsl.core.threadgroups.BaseThreadGroup.ThreadGroup
  * engine.addRequest(request);
  * TestPlanStats stats = engine.runTest();
  * }</pre>
- * 
- * <p>Updated to use the unified reporting structure that stores JTL files, HTML reports,
- * and logs in a consistent directory structure:
- * target/unified-reports/protocol_timestamp_uniqueId/
- *   - jtl files
- *   - html/ (contains HTML reports)
- *   - logs/ (contains log files)</p>
  */
 public class TestEngine {
     private static final Logger logger = LoggerFactory.getLogger(TestEngine.class);
@@ -87,10 +79,6 @@ public class TestEngine {
     private final List<RequestEntity> requests;
     private final Map<String, Path> resultPaths;
     private final Map<String, Path> htmlReportPaths;
-    private final Map<String, Path> unifiedReportPaths;
-    
-    // Base directory for unified reporting structure
-    private static final String UNIFIED_REPORTS_BASE = "target/unified-reports";
     
     private int threads = 1;
     private int iterations = 1;
@@ -122,30 +110,17 @@ public class TestEngine {
      * <p>This constructor allows for dependency injection of a TestSystem instance.
      * It will reuse the provided TestSystem without registering additional components.</p>
      * 
-     * <p>This constructor creates a new TestSystem internally to avoid exposing internal representation.
-     * Components from the provided TestSystem are not copied - we simply use it to check if we need
-     * to register default components.</p>
-     * 
      * @param testSystem The TestSystem to use
      */
     public TestEngine(TestSystem testSystem) {
-        ErrorHandler.validateNotNull(testSystem, ErrorCode.GENERAL_ERROR, "TestSystem cannot be null");
-        
-        // Create a new TestSystem to avoid storing the externally provided one directly
-        this.testSystem = new TestSystem();
+        this.testSystem = testSystem;
         this.requests = new ArrayList<>();
         this.resultPaths = new HashMap<>();
         this.htmlReportPaths = new HashMap<>();
-        this.unifiedReportPaths = new HashMap<>();
         
-        // Register default components if original TestSystem is empty
+        // Register default components if TestSystem is empty
         if (testSystem.getComponentCount() == 0) {
             registerDefaultComponents();
-        } else {
-            // Since we can't easily copy components from the provided TestSystem,
-            // we register default components in our new instance
-            registerDefaultComponents();
-            logger.warn("Created new TestSystem instance with default components. Custom components in provided TestSystem are not copied.");
         }
     }
     
@@ -404,9 +379,6 @@ public class TestEngine {
      * <p>It handles setting up the result directories, configuring logging,
      * creating the JMeter test plan, and returning the test statistics.</p>
      * 
-     * <p>This method has been updated to work with the new unified reporting structure
-     * that stores JTL, HTML, and log files in a consistent directory layout.</p>
-     * 
      * @return TestPlanStats containing the results of the test execution
      * @throws IOException If there's an error creating result directories
      * @throws TestExecutionException If an error occurs during test setup or execution
@@ -420,15 +392,11 @@ public class TestEngine {
                 threads, iterations, rampUp);
                 
         // Configure JMeter logging for this specific test execution
-        // The JMeterLogConfiguration now creates a unified directory structure
         String testLogFile = JMeterLogConfiguration.configureLogging(protocolName);
         logger.info("JMeter logs will be written to: {}", testLogFile);
         
-        // Get the unified directory path that was created by the log configuration
-        Path unifiedReportDir = JMeterLogConfiguration.getUnifiedReportDirectory();
-        
-        // Create results directories within the unified structure
-        ResultsDirectories resultDirs = createResultsDirectories(protocolName, unifiedReportDir);
+        // Create results directories
+        ResultsDirectories resultDirs = createResultsDirectories(protocolName);
         Path jtlPath = resultDirs.jtlPath;
         Path htmlPath = resultDirs.htmlPath;
         logger.info("Test results will be written to: {}", jtlPath);
@@ -449,131 +417,11 @@ public class TestEngine {
             // Run the test and return the statistics
             TestPlanStats stats = testPlan.run();
             logger.info("Test execution completed successfully");
-            
-            // Store the unified report directory path for reference
-            // Create a summary file to help navigate the unified structure
-            createReportSummary(unifiedReportDir, jtlPath, htmlPath);
-            
             return stats;
         } catch (Exception e) {
             logger.error("Test execution failed", e);
             throw new TestExecutionException(ErrorCode.TEST_EXECUTION_ERROR, "Test execution failed", e);
         }
-    }
-    
-    /**
-     * Creates a summary file within the unified report directory to help navigate
-     * between the different report files.
-     * 
-     * @param unifiedDir The unified report directory
-     * @param jtlPath The path to the JTL file
-     * @param htmlPath The path to the HTML report directory
-     * @throws IOException If there's an error creating the summary file
-     */
-    private void createReportSummary(Path unifiedDir, Path jtlPath, Path htmlPath) throws IOException {
-        if (unifiedDir == null) {
-            logger.warn("Unable to create report summary: unified directory is null");
-            return;
-        }
-        
-        Path summaryPath = unifiedDir.resolve("summary.html");
-        
-        String dirName = unifiedDir.getFileName().toString();
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        
-        StringBuilder content = new StringBuilder();
-        content.append("<!DOCTYPE html>\n");
-        content.append("<html>\n");
-        content.append("<head>\n");
-        content.append("    <meta charset=\"UTF-8\">\n");
-        content.append("    <title>Unified Test Report Summary</title>\n");
-        content.append("    <style>\n");
-        content.append("        body { font-family: Arial, sans-serif; margin: 20px; }\n");
-        content.append("        h1 { color: #333366; }\n");
-        content.append("        h2 { color: #336699; margin-top: 20px; }\n");
-        content.append("        .info { margin: 20px 0; padding: 10px; background-color: #f0f0f0; border-radius: 5px; }\n");
-        content.append("        .info div { margin: 10px 0; }\n");
-        content.append("        .label { font-weight: bold; display: inline-block; width: 150px; }\n");
-        content.append("        .section { margin: 20px 0; padding: 10px; background-color: #f8f8f8; border-radius: 5px; }\n");
-        content.append("        .not-available { color: #999; font-style: italic; }\n");
-        content.append("        ul { margin-top: 5px; }\n");
-        content.append("    </style>\n");
-        content.append("</head>\n");
-        content.append("<body>\n");
-        content.append("    <h1>Unified Test Report Summary</h1>\n");
-        content.append("    <div class=\"info\">\n");
-        content.append("        <div><span class=\"label\">Test Directory:</span> ").append(dirName).append("</div>\n");
-        content.append("        <div><span class=\"label\">Protocol:</span> ").append(protocolName).append("</div>\n");
-        content.append("        <div><span class=\"label\">Generated:</span> ").append(timestamp).append("</div>\n");
-        content.append("    </div>\n");
-        
-        // Add JTL file section
-        content.append("    <div class=\"section\">\n");
-        content.append("        <h2>JTL Results</h2>\n");
-        if (jtlPath != null && Files.exists(jtlPath)) {
-            content.append("        <ul>\n");
-            content.append("            <li><a href=\"").append(jtlPath.getFileName()).append("\">")
-                    .append(jtlPath.getFileName()).append("</a></li>\n");
-            content.append("        </ul>\n");
-        } else {
-            content.append("        <p class=\"not-available\">No JTL results available</p>\n");
-        }
-        content.append("    </div>\n");
-        
-        // Add HTML report section
-        content.append("    <div class=\"section\">\n");
-        content.append("        <h2>HTML Reports</h2>\n");
-        if (htmlPath != null && Files.exists(htmlPath)) {
-            content.append("        <ul>\n");
-            Path indexPath = htmlPath.resolve("index.html");
-            if (Files.exists(indexPath)) {
-                content.append("            <li><a href=\"html/index.html\">HTML Report</a></li>\n");
-            } else {
-                content.append("            <li>HTML directory exists but no index.html found</li>\n");
-            }
-            content.append("        </ul>\n");
-        } else {
-            content.append("        <p class=\"not-available\">No HTML reports available</p>\n");
-        }
-        content.append("    </div>\n");
-        
-        // Add log files section
-        Path logsDir = unifiedDir.resolve("logs");
-        content.append("    <div class=\"section\">\n");
-        content.append("        <h2>Log Files</h2>\n");
-        if (Files.exists(logsDir) && Files.isDirectory(logsDir)) {
-            content.append("        <ul>\n");
-            try {
-                Files.list(logsDir)
-                        .filter(path -> path.toString().endsWith(".log"))
-                        .forEach(path -> content.append("            <li><a href=\"logs/").append(path.getFileName()).append("\">")
-                                .append(path.getFileName()).append("</a></li>\n"));
-            } catch (IOException e) {
-                content.append("            <li>Error listing log files: ").append(e.getMessage()).append("</li>\n");
-            }
-            content.append("        </ul>\n");
-        } else {
-            content.append("        <p class=\"not-available\">No log files available</p>\n");
-        }
-        content.append("    </div>\n");
-        
-        // Add test configuration section
-        content.append("    <div class=\"section\">\n");
-        content.append("        <h2>Test Configuration</h2>\n");
-        content.append("        <ul>\n");
-        content.append("            <li><span class=\"label\">Test Plan Name:</span> ").append(testPlanName).append("</li>\n");
-        content.append("            <li><span class=\"label\">Threads:</span> ").append(threads).append("</li>\n");
-        content.append("            <li><span class=\"label\">Iterations:</span> ").append(iterations).append("</li>\n");
-        content.append("            <li><span class=\"label\">Ramp-up:</span> ").append(rampUp).append("</li>\n");
-        content.append("            <li><span class=\"label\">Requests:</span> ").append(requests.size()).append("</li>\n");
-        content.append("        </ul>\n");
-        content.append("    </div>\n");
-        
-        content.append("</body>\n");
-        content.append("</html>\n");
-        
-        Files.writeString(summaryPath, content.toString());
-        logger.info("Created report summary at: {}", summaryPath);
     }
     
     /**
@@ -588,7 +436,7 @@ public class TestEngine {
         List<ThreadGroupChild> samplers = new ArrayList<>();
         
         for (RequestEntity request : requests) {
-            // Apply modifiers based on request type
+            // Apply the appropriate modifier based on request type
             if (request instanceof HttpRequestEntity && httpModifier != null) {
                 httpModifier.accept((HttpRequestEntity) request);
             } else if (request instanceof GraphQLRequestEntity && graphqlModifier != null) {
@@ -601,104 +449,109 @@ public class TestEngine {
                 jdbcModifier.accept((JdbcRequestEntity) request);
             }
             
-            // Process the request with the TestSystem to generate the sampler
-            Result<BaseThreadGroup.ThreadGroupChild> result = testSystem.safeProcessRequest(request);
-            
+            // Process the request with the appropriate component
+            Result<ThreadGroupChild> result = testSystem.processRequest(request);
             if (result.isSuccess()) {
-                // Add the generated sampler to the list
                 samplers.add(result.getValue());
             } else {
-                // Log the error but continue with other samplers
-                logger.error("Failed to process request: {} - {}", result.getErrorCode(), result.getErrorMessage());
+                logger.error("Failed to process request: {}", result.getException().getMessage());
+                throw new TestExecutionException(ErrorCode.TEST_EXECUTION_ERROR, 
+                        "Failed to process request", result.getException());
             }
         }
         
-        // Convert the list to an array for the threadGroup method
         return samplers.toArray(new ThreadGroupChild[0]);
     }
     
     /**
-     * Creates the necessary directories for storing test results.
+     * Creates the directories for storing JTL and HTML results.
      * 
-     * <p>This method creates directories for JTL files and HTML reports
-     * using the new unified directory structure.</p>
+     * <p>This method is now deprecated in favor of createResultsDirectories which
+     * handles both JTL and HTML report directories.</p>
      * 
-     * @param protocol Protocol name for directory naming
-     * @param unifiedReportDir The unified report directory to use (created by JMeterLogConfiguration)
-     * @return A ResultsDirectories object containing the paths
+     * @param protocol Protocol name used for directory naming
+     * @return Path to the JTL file where results will be stored
      * @throws IOException If directory creation fails
+     * @deprecated Use {@link #createResultsDirectories(String)} instead
      */
-    private ResultsDirectories createResultsDirectories(String protocol, Path unifiedReportDir) throws IOException {
-        // Create a JTL file path within the unified directory
-        Path jtlPath = unifiedReportDir.resolve(String.format("%s.jtl", protocol));
+    @Deprecated
+    private Path createResultsDirectory(String protocol) throws IOException {
+        // Use the same timestamp and unique ID as the log configuration
+        String directoryName = protocol + "_" + JMeterLogConfiguration.getRunDirectoryName();
         
-        // HTML reports will be in a subdirectory of the unified directory
-        Path htmlPath = unifiedReportDir.resolve("html");
-        if (!Files.exists(htmlPath)) {
-            Files.createDirectories(htmlPath);
-        }
+        // Create the directory
+        Path resultsDir = Paths.get("target", "jtl-results", directoryName);
+        Files.createDirectories(resultsDir);
         
-        // Store the paths for later reference
-        resultPaths.put(protocol, jtlPath);
-        htmlReportPaths.put(protocol, htmlPath);
-        unifiedReportPaths.put(protocol, unifiedReportDir);
+        // Store the path in the result paths map
+        resultPaths.put(protocol, resultsDir);
         
-        logger.info("Configured unified directory structure:");
-        logger.info("  Unified Directory: {}", unifiedReportDir);
-        logger.info("  JTL File: {}", jtlPath);
-        logger.info("  HTML Reports: {}", htmlPath);
-        logger.info("  Log Files: {}", unifiedReportDir.resolve("logs"));
-        
-        return new ResultsDirectories(jtlPath, htmlPath);
+        // Return the path to the JTL file
+        return resultsDir.resolve("results.jtl");
     }
     
     /**
-     * Get the path to the JTL results file for a protocol.
+     * Creates the directories for storing JTL and HTML results.
      * 
-     * <p>If you've run multiple tests with the same protocol, this will return
-     * the path for the most recent test.</p>
+     * <p>This method creates both JTL result directories for raw data and HTML report
+     * directories for human-readable reports, using the same naming pattern for consistency.</p>
+     * 
+     * @param protocol Protocol name used for directory naming
+     * @return ResultsDirectories object containing paths to both JTL and HTML directories
+     * @throws IOException If directory creation fails
+     */
+    private ResultsDirectories createResultsDirectories(String protocol) throws IOException {
+        // Use the same timestamp and unique ID as the log configuration
+        String directoryName = protocol + "_" + JMeterLogConfiguration.getRunDirectoryName();
+        
+        // Create the JTL results directory
+        Path jtlDir = Paths.get("target", "jtl-results", directoryName);
+        Files.createDirectories(jtlDir);
+        Path jtlPath = jtlDir.resolve("results.jtl");
+        
+        // Create the HTML reports directory
+        Path htmlDir = Paths.get("target", "html-reports", directoryName);
+        Files.createDirectories(htmlDir);
+        
+        // Store the paths in the maps
+        resultPaths.put(protocol, jtlDir);
+        htmlReportPaths.put(protocol, htmlDir);
+        
+        return new ResultsDirectories(jtlPath, htmlDir);
+    }
+    
+    /**
+     * Gets the path where test results are stored for a specific protocol.
+     * 
+     * <p>If no tests have been run for the specified protocol, this method returns null.</p>
      * 
      * @param protocol The protocol name
-     * @return The path to the JTL file, or null if not found
+     * @return The path to the results directory, or null if none exists
      */
     public Path getResultsPath(String protocol) {
         return resultPaths.get(protocol);
     }
     
     /**
-     * Get the path to the HTML report directory for a protocol.
+     * Gets the path where HTML reports are stored for a specific protocol.
      * 
-     * <p>If you've run multiple tests with the same protocol, this will return
-     * the path for the most recent test.</p>
+     * <p>If no tests have been run for the specified protocol, this method returns null.</p>
      * 
      * @param protocol The protocol name
-     * @return The path to the HTML report directory, or null if not found
+     * @return The path to the HTML reports directory, or null if none exists
      */
     public Path getHtmlReportPath(String protocol) {
         return htmlReportPaths.get(protocol);
     }
     
     /**
-     * Get the path to the unified report directory for a protocol.
-     * 
-     * <p>If you've run multiple tests with the same protocol, this will return
-     * the path for the most recent test.</p>
-     * 
-     * @param protocol The protocol name
-     * @return The path to the unified report directory, or null if not found
-     */
-    public Path getUnifiedReportPath(String protocol) {
-        return unifiedReportPaths.get(protocol);
-    }
-    
-    /**
-     * Simple class to hold the paths for test results.
+     * Simple class to hold both JTL and HTML results paths.
      */
     private static class ResultsDirectories {
-        final Path jtlPath;
-        final Path htmlPath;
+        public final Path jtlPath;
+        public final Path htmlPath;
         
-        ResultsDirectories(Path jtlPath, Path htmlPath) {
+        public ResultsDirectories(Path jtlPath, Path htmlPath) {
             this.jtlPath = jtlPath;
             this.htmlPath = htmlPath;
         }

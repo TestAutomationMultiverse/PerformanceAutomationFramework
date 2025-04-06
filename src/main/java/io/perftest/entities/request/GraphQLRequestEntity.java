@@ -1,7 +1,9 @@
 package io.perftest.entities.request;
 
 import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Collections;
 import java.io.IOException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -63,7 +65,8 @@ public class GraphQLRequestEntity extends RequestEntity {
      * @return GraphQL variables
      */
     public Map<String, Object> getVariables() {
-        return variables;
+        if (variables == null) return null;
+        return Collections.unmodifiableMap(variables);
     }
     
     /**

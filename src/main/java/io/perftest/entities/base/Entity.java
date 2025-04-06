@@ -1,5 +1,6 @@
 package io.perftest.entities.base;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -105,5 +106,14 @@ public abstract class Entity {
     @SuppressWarnings("unchecked")
     public <T> T getProperty(String key, T defaultValue) {
         return properties.containsKey(key) ? (T) properties.get(key) : defaultValue;
+    }
+    
+    /**
+     * Get all properties of this entity
+     * 
+     * @return An unmodifiable map of all properties
+     */
+    public Map<String, Object> getProperties() {
+        return Collections.unmodifiableMap(properties);
     }
 }

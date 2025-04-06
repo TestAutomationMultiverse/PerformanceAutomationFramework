@@ -1,7 +1,9 @@
 package io.perftest.entities.request;
 
 import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Collections;
 
 /**
  * Entity representing a SOAP request
@@ -87,7 +89,8 @@ public class SoapRequestEntity extends XmlRequestEntity {
      * @return Variables for template substitution
      */
     public Map<String, Object> getVariables() {
-        return variables;
+        if (variables == null) return null;
+        return Collections.unmodifiableMap(variables);
     }
     
     /**

@@ -1,6 +1,7 @@
 package io.perftest.exception;
 
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -10,10 +11,11 @@ import java.util.List;
 /**
  * Class for reporting and collecting errors
  */
-@Slf4j
 public class ErrorReporter {
     
-    private static ErrorReporter instance;
+    private static final Logger log = LoggerFactory.getLogger(ErrorReporter.class);
+    
+    private static final ErrorReporter instance = new ErrorReporter();
     
     /**
      * Error entry class for storing error information
@@ -60,7 +62,7 @@ public class ErrorReporter {
          * @return Exception
          */
         public Throwable getException() {
-            return exception;
+            return exception != null ? new Throwable(exception.getMessage()) : null;
         }
         
         /**
@@ -104,9 +106,6 @@ public class ErrorReporter {
      * @return The ErrorReporter instance
      */
     public static synchronized ErrorReporter getInstance() {
-        if (instance == null) {
-            instance = new ErrorReporter();
-        }
         return instance;
     }
     

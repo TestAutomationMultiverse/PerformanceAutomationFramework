@@ -14,6 +14,13 @@ import java.util.UUID;
 /**
  * Utility class to configure JMeter logging
  * This class sets the system property to redirect JMeter logs to the test-specific folders
+ * 
+ * Updated to use the unified reporting structure that stores JTL files, HTML reports,
+ * and logs in a consistent directory structure:
+ * target/unified-reports/protocol_timestamp_uniqueId/
+ *   - jtl files
+ *   - html/ (contains HTML reports)
+ *   - logs/ (contains log files)
  */
 public class JMeterLogConfiguration {
     private static final Logger logger = LoggerFactory.getLogger(JMeterLogConfiguration.class);
@@ -24,6 +31,12 @@ public class JMeterLogConfiguration {
     // These can then be reused for JTL and HTML reports
     private static String currentTimestamp;
     private static String currentUniqueId;
+    
+    // Base directories for unified reporting structure
+    private static final String UNIFIED_REPORTS_BASE = "target/unified-reports";
+    
+    // Unified test directory for the current test run
+    private static Path unifiedTestDir;
     
     /**
      * Configure JMeter logging to use the target directory
@@ -65,19 +78,30 @@ public class JMeterLogConfiguration {
         }
         
         // Create protocol-specific log directory with timestamp and unique ID
-        currentTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
+        // Format timestamp as yyyyMMdd_HHmmss to make it filename-friendly
+        currentTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         currentUniqueId = UUID.randomUUID().toString().substring(0, 8);
         
-        // Create a unique directory for this test run
-        Path testLogDir = targetDir.resolve("logs").resolve(protocolName);
-        Path uniqueTestLogDir = testLogDir.resolve(currentTimestamp + "_" + currentUniqueId);
+        // Create a unified report directory with protocol_timestamp_uniqueId pattern
+        String dirName = String.format("%s_%s_%s", 
+                protocolName, 
+                currentTimestamp, 
+                currentUniqueId);
         
-        if (!Files.exists(uniqueTestLogDir)) {
-            Files.createDirectories(uniqueTestLogDir);
+        // Create the unified report directory
+        unifiedTestDir = Paths.get(UNIFIED_REPORTS_BASE, dirName);
+        if (!Files.exists(unifiedTestDir)) {
+            Files.createDirectories(unifiedTestDir);
+        }
+        
+        // Create logs subdirectory
+        Path logsDir = unifiedTestDir.resolve("logs");
+        if (!Files.exists(logsDir)) {
+            Files.createDirectories(logsDir);
         }
         
         // Create a unique log file name for this test run
-        Path logFile = uniqueTestLogDir.resolve("jmeter.log");
+        Path logFile = logsDir.resolve("jmeter.log");
         
         // Set JMeter log file location
         System.setProperty("jmeter.logfile", logFile.toString());
@@ -86,11 +110,43 @@ public class JMeterLogConfiguration {
         System.setProperty("apache.jmeter.log", logFile.toString());
         
         // Let's try setting the log directory as well
-        System.setProperty("jmeter.home", uniqueTestLogDir.toString());
+        System.setProperty("jmeter.home", logsDir.toString());
         
-        // Set additional properties to prevent JMeter from using/overwriting files in bin directory
-        System.setProperty("jmeter.save.saveservice.output_format", "xml");
-        System.setProperty("jmeter.reportgenerator.exporter.html.property.output_dir", uniqueTestLogDir.toString());
+        // Set output format to CSV to ensure compatibility with JMeter's HTML reporter
+        // Note: HtmlReporter explicitly requires CSV format
+        System.setProperty("jmeter.save.saveservice.output_format", "csv");
+
+        // Configure required fields for CSV format
+        System.setProperty("jmeter.save.saveservice.timestamp_format", "yyyy/MM/dd HH:mm:ss.SSS");
+        System.setProperty("jmeter.save.saveservice.print_field_names", "true");
+        System.setProperty("jmeter.save.saveservice.successful", "true");
+        System.setProperty("jmeter.save.saveservice.label", "true");
+        System.setProperty("jmeter.save.saveservice.time", "true");
+        System.setProperty("jmeter.save.saveservice.thread_name", "true");
+        System.setProperty("jmeter.save.saveservice.data_type", "true");
+        System.setProperty("jmeter.save.saveservice.message", "true");
+        System.setProperty("jmeter.save.saveservice.response_code", "true");
+        System.setProperty("jmeter.save.saveservice.response_message", "true");
+        System.setProperty("jmeter.save.saveservice.subresults", "true");
+        System.setProperty("jmeter.save.saveservice.assertions", "true");
+        System.setProperty("jmeter.save.saveservice.latency", "true");
+        System.setProperty("jmeter.save.saveservice.connect_time", "true");
+        System.setProperty("jmeter.save.saveservice.bytes", "true");
+        System.setProperty("jmeter.save.saveservice.sent_bytes", "true");
+        System.setProperty("jmeter.save.saveservice.sample_count", "true");
+        System.setProperty("jmeter.save.saveservice.idle_time", "true");
+        System.setProperty("jmeter.save.saveservice.thread_counts", "true");
+        System.setProperty("jmeter.save.saveservice.assertion_results_failure_message", "true");
+        
+        // Configure JMeter to use our unified directory structure for HTML reports
+        Path htmlDir = unifiedTestDir.resolve("html");
+        if (!Files.exists(htmlDir)) {
+            Files.createDirectories(htmlDir);
+        }
+        System.setProperty("jmeter.reportgenerator.exporter.html.property.output_dir", htmlDir.toString());
+        
+        logger.info("Configured unified report directory: {}", unifiedTestDir);
+        logger.info("Log file: {}", logFile);
         
         return logFile.toString();
     }
@@ -99,12 +155,12 @@ public class JMeterLogConfiguration {
      * Get the current timestamp for this test run
      * This can be used to create consistently named directories for logs, JTL files, and HTML reports
      * 
-     * @return The current timestamp string (yyyy-MM-dd_HH-mm-ss format)
+     * @return The current timestamp string (yyyyMMdd_HHmmss format)
      */
     public static String getCurrentTimestamp() {
         // Generate a new timestamp if none exists yet
         if (currentTimestamp == null) {
-            currentTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
+            currentTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         }
         return currentTimestamp;
     }
@@ -130,5 +186,74 @@ public class JMeterLogConfiguration {
      */
     public static String getRunDirectoryName() {
         return getCurrentTimestamp() + "_" + getCurrentUniqueId();
+    }
+    
+    /**
+     * Get the unified report directory for the current test run
+     * 
+     * @return Path to the unified report directory
+     */
+    public static Path getUnifiedReportDirectory() {
+        return unifiedTestDir;
+    }
+    
+    /**
+     * Get the unified report directory path as a string
+     * 
+     * @return String path to the unified report directory
+     */
+    public static String getUnifiedReportDirectoryPath() {
+        if (unifiedTestDir == null) {
+            return null;
+        }
+        return unifiedTestDir.toString();
+    }
+    
+    /**
+     * Get the JTL file path for the current test run
+     * This assumes the JTL file will be placed directly in the unified report directory
+     * 
+     * @param fileName JTL file name to use (if null, a default name will be used)
+     * @return Path to the JTL file
+     */
+    public static Path getJtlFilePath(String fileName) {
+        if (unifiedTestDir == null) {
+            logger.warn("Unified report directory not initialized, cannot get JTL file path");
+            return null;
+        }
+        
+        if (fileName == null || fileName.isEmpty()) {
+            fileName = "results.jtl";
+        }
+        
+        return unifiedTestDir.resolve(fileName);
+    }
+    
+    /**
+     * Get the HTML report directory for the current test run
+     * 
+     * @return Path to the HTML report directory
+     */
+    public static Path getHtmlReportDirectory() {
+        if (unifiedTestDir == null) {
+            logger.warn("Unified report directory not initialized, cannot get HTML report directory");
+            return null;
+        }
+        
+        return unifiedTestDir.resolve("html");
+    }
+    
+    /**
+     * Get the logs directory for the current test run
+     * 
+     * @return Path to the logs directory
+     */
+    public static Path getLogsDirectory() {
+        if (unifiedTestDir == null) {
+            logger.warn("Unified report directory not initialized, cannot get logs directory");
+            return null;
+        }
+        
+        return unifiedTestDir.resolve("logs");
     }
 }

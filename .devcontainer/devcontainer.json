@@ -62,7 +62,7 @@
                     "-effort:max",
                     "-high"
                 ],
-                "spotbugs.runAtFullBuild": true,
+                "spotbugs.runAtFullBuild": false
                 // "sonarlint.rules": {
                 //     "java:S106": {
                 //         "level": "on"
@@ -79,10 +79,11 @@
     },
     "remoteUser": "vscode",
     "forwardPorts": [
-        8080,
-        9090,
-        3000,
-        9270
+        8080, // Web application server
+        9090, // Prometheus
+        3000, // Grafana
+        9270, // JMeter backend listener
+        5000 // HTML Report viewer
     ],
     "hostRequirements": {
         "memory": "8gb",

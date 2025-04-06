@@ -1,198 +1,184 @@
 package io.perftest.factories;
 
+import io.perftest.entities.base.Entity;
 import io.perftest.entities.request.GraphQLRequestEntity;
 import io.perftest.entities.request.HttpRequestEntity;
 import io.perftest.entities.request.JdbcRequestEntity;
-import io.perftest.entities.request.RequestEntity;
 import io.perftest.entities.request.SoapRequestEntity;
-import io.perftest.entities.request.XmlRequestEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 /**
- * Factory class for creating request entities.
- * 
- * <p>This class centralizes the creation of different request entities,
- * ensuring consistent entity creation across the application. It follows
- * the Entity-Component-System (ECS) architecture by keeping entity creation
- * logic separate from test implementation.</p>
- * 
- * <p>Each method creates a specific type of entity with appropriate configuration
- * based on the provided parameters or config maps.</p>
+ * Factory for creating request entity instances.
  */
 public class EntityFactory {
+    
     private static final Logger logger = LoggerFactory.getLogger(EntityFactory.class);
-
+    
     /**
-     * Creates an HTTP request entity from a configuration map.
+     * Creates an entity based on the provided configuration.
      * 
-     * @param config The configuration map containing request parameters
+     * @param requestConfig The request configuration
+     * @return The created entity
+     * @throws UnsupportedOperationException If the request type is not supported
+     */
+    @SuppressWarnings("unchecked")
+    public static Entity createEntity(Map<String, Object> requestConfig) {
+        if (requestConfig == null || requestConfig.isEmpty()) {
+            logger.warn("Empty request configuration provided");
+            return null;
+        }
+        
+        String type = (String) requestConfig.getOrDefault("type", "http");
+        
+        switch (type.toLowerCase()) {
+            case "http":
+                return createHttpEntity(requestConfig);
+            case "graphql":
+                return createGraphQLEntity(requestConfig);
+            case "soap":
+                return createSoapEntity(requestConfig);
+            case "jdbc":
+                return createJdbcEntity(requestConfig);
+            default:
+                logger.error("Unsupported request type: {}", type);
+                throw new UnsupportedOperationException("Unsupported request type: " + type);
+        }
+    }
+    
+    /**
+     * Creates an HTTP request entity.
+     * 
+     * @param requestConfig The request configuration
      * @return A configured HttpRequestEntity
      */
-    public static HttpRequestEntity createHttpEntity(Map<String, Object> config) {
-        Map<String, Object> requestConfig = getRequestConfig(config);
-        
-        String name = (String) requestConfig.getOrDefault("name", "HTTP Request");
-        String endpoint = (String) requestConfig.getOrDefault("endpoint", "https://example.com/api");
-        
-        // Create entity with the URL and then set the name as a property
-        HttpRequestEntity entity = new HttpRequestEntity(endpoint);
-        entity.setName(name);
-        
-        // Set method if present (default to GET)
+    @SuppressWarnings("unchecked")
+    public static HttpRequestEntity createHttpEntity(Map<String, Object> requestConfig) {
+        String url = (String) requestConfig.getOrDefault("url", "");
         String method = (String) requestConfig.getOrDefault("method", "GET");
+        String body = (String) requestConfig.getOrDefault("body", "");
+        Map<String, String> headers = (Map<String, String>) requestConfig.getOrDefault("headers", Collections.emptyMap());
+        
+        HttpRequestEntity entity = new HttpRequestEntity(url);
         entity.setMethod(method);
+        entity.setBody(body);
+        entity.setHeaders(headers);
         
-        // Set body if present
-        if (requestConfig.containsKey("body")) {
-            String body = (String) requestConfig.get("body");
-            entity.setBody(body);
-        }
+        // Set name if present
+        String name = (String) requestConfig.getOrDefault("name", method + " " + url);
+        entity.setProperty("name", name);
         
-        // Set expected status if present
-        if (requestConfig.containsKey("expectedStatus")) {
-            int expectedStatus = (Integer) requestConfig.get("expectedStatus");
-            entity.setExpectedStatus(expectedStatus);
-        }
-        
-        // Set content type if present
-        if (requestConfig.containsKey("contentType")) {
-            String contentType = (String) requestConfig.get("contentType");
-            entity.setContentType(contentType);
-        }
-        
-        // Set headers if present
-        if (requestConfig.containsKey("headers")) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> headers = (Map<String, Object>) requestConfig.get("headers");
-            for (Map.Entry<String, Object> header : headers.entrySet()) {
-                entity.addHeader(header.getKey(), header.getValue().toString());
-            }
-        }
-        
-        logger.debug("Created HTTP entity: {}", entity.getUrl());
+        logger.debug("Created HTTP entity with URL: {}", url);
         return entity;
     }
     
     /**
-     * Creates a simple HTTP request entity with minimal configuration.
+     * Creates an HTTP request entity with URL and method.
      * 
-     * @param url The URL to request
-     * @param method The HTTP method (GET, POST, PUT, DELETE, etc.)
+     * @param url The URL for the request
+     * @param method The HTTP method (GET, POST, etc.)
      * @return A configured HttpRequestEntity
      */
     public static HttpRequestEntity createHttpEntity(String url, String method) {
         HttpRequestEntity entity = new HttpRequestEntity(url);
         entity.setMethod(method);
-        entity.setName(method + " " + url);
+        entity.setProperty("name", method + " " + url);
         
-        logger.debug("Created HTTP entity: {} {}", method, url);
-        return entity;
-    }
-    
-    /**
-     * Creates a simple HTTP request entity with minimal configuration.
-     * Default to GET method.
-     * 
-     * @param url The URL to request
-     * @return A configured HttpRequestEntity
-     */
-    public static HttpRequestEntity createHttpEntity(String url) {
-        return createHttpEntity(url, "GET");
-    }
-    
-    /**
-     * Creates an HTTP request entity with body.
-     * 
-     * @param url The URL to request
-     * @param method The HTTP method (GET, POST, PUT, DELETE, etc.)
-     * @param body The request body
-     * @return A configured HttpRequestEntity
-     */
-    public static HttpRequestEntity createHttpEntity(String url, String method, String body) {
-        HttpRequestEntity entity = createHttpEntity(url, method);
-        entity.setBody(body);
-        return entity;
-    }
-    
-    /**
-     * Creates a GraphQL request entity from a configuration map.
-     * 
-     * @param config The configuration map containing request parameters
-     * @return A configured GraphQLRequestEntity
-     */
-    public static GraphQLRequestEntity createGraphQLEntity(Map<String, Object> config) {
-        Map<String, Object> requestConfig = getRequestConfig(config);
-        
-        String endpoint = (String) requestConfig.getOrDefault("endpoint", "https://example.com/graphql");
-        String query = (String) requestConfig.getOrDefault("query", "query { }");
-        
-        GraphQLRequestEntity entity = new GraphQLRequestEntity();
-        entity.setUrl(endpoint);
-        entity.setQuery(query);
-        
-        // Set name if present
-        String name = (String) requestConfig.getOrDefault("name", "GraphQL Request");
-        entity.setProperty("name", name);
-        
-        // Set variables if present
-        if (requestConfig.containsKey("variables")) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> variables = (Map<String, Object>) requestConfig.get("variables");
-            for (Map.Entry<String, Object> variable : variables.entrySet()) {
-                entity.addVariable(variable.getKey(), variable.getValue().toString());
-            }
-        }
-        
-        // Set headers if present
-        if (requestConfig.containsKey("headers")) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> headers = (Map<String, Object>) requestConfig.get("headers");
-            for (Map.Entry<String, Object> header : headers.entrySet()) {
-                entity.addHeader(header.getKey(), header.getValue().toString());
-            }
-        }
-        
-        logger.debug("Created GraphQL entity for endpoint: {}", endpoint);
+        logger.debug("Created HTTP entity with URL: {}", url);
         return entity;
     }
     
     /**
      * Creates a GraphQL request entity.
      * 
-     * @param endpoint The GraphQL endpoint
-     * @param query The GraphQL query
+     * @param requestConfig The request configuration
      * @return A configured GraphQLRequestEntity
      */
-    public static GraphQLRequestEntity createGraphQLEntity(String endpoint, String query) {
-        GraphQLRequestEntity entity = new GraphQLRequestEntity();
-        entity.setUrl(endpoint);
-        entity.setQuery(query);
-        entity.setProperty("name", "GraphQL to " + endpoint);
+    @SuppressWarnings("unchecked")
+    public static GraphQLRequestEntity createGraphQLEntity(Map<String, Object> requestConfig) {
+        String url = (String) requestConfig.getOrDefault("url", "");
+        String query = (String) requestConfig.getOrDefault("query", "");
+        Map<String, Object> variables = (Map<String, Object>) requestConfig.getOrDefault("variables", Collections.emptyMap());
+        Map<String, String> headers = (Map<String, String>) requestConfig.getOrDefault("headers", Collections.emptyMap());
         
-        logger.debug("Created GraphQL entity for endpoint: {}", endpoint);
+        GraphQLRequestEntity entity = new GraphQLRequestEntity(url);
+        entity.setQuery(query);
+        entity.setVariables(variables);
+        entity.setHeaders(headers);
+        
+        // Set name if present
+        String name = (String) requestConfig.getOrDefault("name", "GraphQL Query");
+        entity.setProperty("name", name);
+        
+        logger.debug("Created GraphQL entity with URL: {}", url);
         return entity;
     }
     
     /**
-     * Creates a JDBC request entity from a configuration map.
+     * Creates a GraphQL request entity with URL and query.
      * 
-     * @param config The configuration map containing request parameters
+     * @param url The URL for the GraphQL endpoint
+     * @param query The GraphQL query
+     * @return A configured GraphQLRequestEntity
+     */
+    public static GraphQLRequestEntity createGraphQLEntity(String url, String query) {
+        GraphQLRequestEntity entity = new GraphQLRequestEntity(url);
+        entity.setQuery(query);
+        entity.setProperty("name", "GraphQL Query");
+        
+        logger.debug("Created GraphQL entity with URL: {}", url);
+        return entity;
+    }
+    
+    /**
+     * Creates a SOAP request entity.
+     * 
+     * @param requestConfig The request configuration
+     * @return A configured SoapRequestEntity
+     */
+    @SuppressWarnings("unchecked")
+    public static SoapRequestEntity createSoapEntity(Map<String, Object> requestConfig) {
+        String url = (String) requestConfig.getOrDefault("url", "");
+        String soapAction = (String) requestConfig.getOrDefault("soapAction", "");
+        String payload = (String) requestConfig.getOrDefault("payload", "");
+        Map<String, String> headers = (Map<String, String>) requestConfig.getOrDefault("headers", Collections.emptyMap());
+        
+        SoapRequestEntity entity = new SoapRequestEntity(url);
+        entity.setSoapAction(soapAction);
+        entity.setPayload(payload);
+        entity.setHeaders(headers);
+        
+        // Set name if present
+        String name = (String) requestConfig.getOrDefault("name", "SOAP Action: " + soapAction);
+        entity.setProperty("name", name);
+        
+        logger.debug("Created SOAP entity with URL: {}", url);
+        return entity;
+    }
+    
+    /**
+     * Creates a JDBC request entity.
+     * 
+     * @param requestConfig The request configuration
      * @return A configured JdbcRequestEntity
      */
-    public static JdbcRequestEntity createJdbcEntity(Map<String, Object> config) {
-        Map<String, Object> requestConfig = getRequestConfig(config);
-        
-        String query = (String) requestConfig.getOrDefault("query", "SELECT 1");
+    @SuppressWarnings("unchecked")
+    public static JdbcRequestEntity createJdbcEntity(Map<String, Object> requestConfig) {
         String jdbcUrl = (String) requestConfig.getOrDefault("jdbcUrl", "");
+        String query = (String) requestConfig.getOrDefault("query", "");
         String username = (String) requestConfig.getOrDefault("username", "");
         String password = (String) requestConfig.getOrDefault("password", "");
         String driverClass = (String) requestConfig.getOrDefault("driverClass", "");
         
-        JdbcRequestEntity entity = new JdbcRequestEntity(jdbcUrl, username, password, driverClass);
-        entity.setQuery(query);
+        JdbcRequestEntity entity = new JdbcRequestEntity(jdbcUrl, query);
+        entity.setUsername(username);
+        entity.setPassword(password);
+        entity.setJdbcDriverClass(driverClass);
         
         // Set name if present
         String name = (String) requestConfig.getOrDefault("name", "JDBC Query");
@@ -212,8 +198,10 @@ public class EntityFactory {
      * @return A configured JdbcRequestEntity
      */
     public static JdbcRequestEntity createJdbcEntity(String jdbcUrl, String username, String password, String query) {
-        JdbcRequestEntity entity = new JdbcRequestEntity(jdbcUrl, username, password, "org.postgresql.Driver");
-        entity.setQuery(query);
+        JdbcRequestEntity entity = new JdbcRequestEntity(jdbcUrl, query);
+        entity.setUsername(username);
+        entity.setPassword(password);
+        entity.setJdbcDriverClass("org.postgresql.Driver");
         entity.setProperty("name", "JDBC Query");
         
         logger.debug("Created JDBC entity with query: {}", query);
@@ -221,93 +209,42 @@ public class EntityFactory {
     }
     
     /**
-     * Creates a SOAP request entity from a configuration map.
+     * Creates a JDBC request entity with default driver.
      * 
-     * @param config The configuration map containing request parameters
-     * @return A configured SoapRequestEntity
+     * @param jdbcUrl The JDBC URL
+     * @param query The SQL query to execute
+     * @return A configured JdbcRequestEntity
      */
-    public static SoapRequestEntity createSoapEntity(Map<String, Object> config) {
-        Map<String, Object> requestConfig = getRequestConfig(config);
+    public static JdbcRequestEntity createJdbcEntity(String jdbcUrl, String query) {
+        JdbcRequestEntity entity = new JdbcRequestEntity(jdbcUrl, query);
+        entity.setJdbcDriverClass("org.postgresql.Driver");
+        entity.setProperty("name", "JDBC Query");
         
-        String endpoint = (String) requestConfig.getOrDefault("endpoint", "https://example.com/soap");
-        String soapAction = (String) requestConfig.getOrDefault("soapAction", "");
-        String payload = (String) requestConfig.getOrDefault("payload", "<Envelope xmlns=\"http://schemas.xmlsoap.org/soap/envelope/\"><Body></Body></Envelope>");
-        
-        SoapRequestEntity entity = new SoapRequestEntity();
-        entity.setUrl(endpoint);
-        entity.setSoapAction(soapAction);
-        entity.setPayload(payload);
-        
-        // Set name if present
-        String name = (String) requestConfig.getOrDefault("name", "SOAP Request");
-        entity.setProperty("name", name);
-        
-        // Set headers if present
-        if (requestConfig.containsKey("headers")) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> headers = (Map<String, Object>) requestConfig.get("headers");
-            for (Map.Entry<String, Object> header : headers.entrySet()) {
-                entity.addHeader(header.getKey(), header.getValue().toString());
-            }
-        }
-        
-        logger.debug("Created SOAP entity for endpoint: {}", endpoint);
+        logger.debug("Created JDBC entity with query: {}", query);
         return entity;
     }
     
     /**
-     * Creates an XML request entity from a configuration map.
+     * Creates a list of entities from a list of request configurations.
      * 
-     * @param config The configuration map containing request parameters
-     * @return A configured XmlRequestEntity
+     * @param requestConfigs The list of request configurations
+     * @return A list of created entities
      */
-    public static XmlRequestEntity createXmlEntity(Map<String, Object> config) {
-        Map<String, Object> requestConfig = getRequestConfig(config);
+    public static List<Entity> createEntities(List<Map<String, Object>> requestConfigs) {
+        if (requestConfigs == null || requestConfigs.isEmpty()) {
+            logger.warn("Empty or null request configurations list provided");
+            return Collections.emptyList();
+        }
         
-        String endpoint = (String) requestConfig.getOrDefault("endpoint", "https://example.com/xml");
-        String body = (String) requestConfig.getOrDefault("body", "<root></root>");
+        List<Entity> entities = new ArrayList<>();
         
-        XmlRequestEntity entity = new XmlRequestEntity();
-        entity.setUrl(endpoint);
-        entity.setBody(body);
-        
-        // Set name if present
-        String name = (String) requestConfig.getOrDefault("name", "XML Request");
-        entity.setProperty("name", name);
-        
-        // Set method if present
-        String method = (String) requestConfig.getOrDefault("method", "POST");
-        entity.setMethod(method);
-        
-        // Set headers if present
-        if (requestConfig.containsKey("headers")) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> headers = (Map<String, Object>) requestConfig.get("headers");
-            for (Map.Entry<String, Object> header : headers.entrySet()) {
-                entity.addHeader(header.getKey(), header.getValue().toString());
+        for (Map<String, Object> config : requestConfigs) {
+            Entity entity = createEntity(config);
+            if (entity != null) {
+                entities.add(entity);
             }
         }
         
-        logger.debug("Created XML entity for endpoint: {}", endpoint);
-        return entity;
-    }
-    
-    /**
-     * Helper method to extract the request configuration from a full configuration map.
-     * 
-     * @param config The full configuration map
-     * @return The request configuration map
-     */
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> getRequestConfig(Map<String, Object> config) {
-        if (config == null) {
-            return Map.of();
-        }
-        
-        if (config.containsKey("request")) {
-            return (Map<String, Object>) config.get("request");
-        }
-        
-        return config;
+        return entities;
     }
 }

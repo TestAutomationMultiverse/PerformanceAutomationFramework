@@ -17,17 +17,55 @@ import java.time.Duration;
 public class JdbcTestBuilder {
     private static final Logger logger = LoggerFactory.getLogger(JdbcTestBuilder.class);
     
+    private JdbcRequestEntity entity;
     private int threads = 1;
     private int iterations = 1;
+    private Duration duration;
     private Duration rampUp = Duration.ofSeconds(1);
-    private JdbcRequestEntity entity;
-    private String reportName = "jdbc_test";
+    private String reportName = "JDBC-Test-Report";
     
     /**
-     * Set the number of threads (virtual users)
-     * 
+     * Create a new builder with default values
+     */
+    public JdbcTestBuilder() {
+    }
+    
+    /**
+     * Static factory method to create a new builder instance
+     * @return A new JdbcTestBuilder instance
+     */
+    public static JdbcTestBuilder builder() {
+        return new JdbcTestBuilder();
+    }
+    
+    /**
+     * Set the JDBC request entity
+     * @param entity JDBC request entity
+     * @return This builder
+     */
+    public JdbcTestBuilder entity(JdbcRequestEntity entity) {
+        if (entity != null) {
+            // Create a deep copy of the entity
+            this.entity = new JdbcRequestEntity()
+                .setUrl(entity.getUrl());
+            
+            if (entity.getQueries() != null) {
+                this.entity.setQueries(new ArrayList<>(entity.getQueries()));
+            }
+            
+            if (entity.getQueryParams() != null) {
+                this.entity.setQueryParams(entity.getQueryParams());
+            }
+        } else {
+            this.entity = null;
+        }
+        return this;
+    }
+    
+    /**
+     * Set the number of threads
      * @param threads Number of threads
-     * @return This builder instance for method chaining
+     * @return This builder
      */
     public JdbcTestBuilder threads(int threads) {
         this.threads = threads;
@@ -35,10 +73,9 @@ public class JdbcTestBuilder {
     }
     
     /**
-     * Set the number of iterations per thread
-     * 
+     * Set the number of iterations
      * @param iterations Number of iterations
-     * @return This builder instance for method chaining
+     * @return This builder
      */
     public JdbcTestBuilder iterations(int iterations) {
         this.iterations = iterations;
@@ -46,41 +83,19 @@ public class JdbcTestBuilder {
     }
     
     /**
-     * Set the request entity for this test
-     * Creates a defensive copy to prevent storing an externally mutable object
-     * 
-     * @param entity The JDBC request entity
-     * @return This builder instance for method chaining
+     * Set the test duration
+     * @param duration Test duration
+     * @return This builder
      */
-    public JdbcTestBuilder entity(JdbcRequestEntity entity) {
-        if (entity == null) {
-            this.entity = new JdbcRequestEntity();
-            return this;
-        }
-        
-        // Create a deep copy of the entity to avoid storing externally mutable object
-        this.entity = new JdbcRequestEntity();
-        this.entity.setUrl(entity.getUrl());
-        this.entity.setMethod(entity.getMethod());
-        
-        // Copy queries if present
-        if (entity.getQueries() != null) {
-            this.entity.setQueries(new ArrayList<>(entity.getQueries()));
-        }
-        
-        // Copy query parameters if present
-        if (entity.getQueryParams() != null) {
-            this.entity.setQueryParams(new ArrayList<>(entity.getQueryParams()));
-        }
-        
+    public JdbcTestBuilder duration(Duration duration) {
+        this.duration = duration;
         return this;
     }
     
     /**
      * Set the ramp-up period
-     * 
-     * @param rampUp The ramp-up duration
-     * @return This builder instance for method chaining
+     * @param rampUp Ramp-up period
+     * @return This builder
      */
     public JdbcTestBuilder rampUp(Duration rampUp) {
         this.rampUp = rampUp;
@@ -88,10 +103,9 @@ public class JdbcTestBuilder {
     }
     
     /**
-     * Set the report name for this test
-     * 
-     * @param reportName The report name
-     * @return This builder instance for method chaining
+     * Set the report name
+     * @param reportName Report name
+     * @return This builder
      */
     public JdbcTestBuilder reportName(String reportName) {
         this.reportName = reportName;
@@ -99,9 +113,16 @@ public class JdbcTestBuilder {
     }
     
     /**
+     * Complete the build and return this builder
+     * @return This builder
+     */
+    public JdbcTestBuilder build() {
+        return this;
+    }
+    
+    /**
      * Run the JDBC test with the configured parameters
-     * 
-     * @return The test statistics
+     * @return Test statistics
      * @throws IOException If an error occurs during test execution
      */
     public TestPlanStats run() throws IOException {

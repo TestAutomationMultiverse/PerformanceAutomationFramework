@@ -4,26 +4,42 @@ import io.perftest.exception.ConfigException;
 import io.perftest.exception.ErrorCode;
 import io.perftest.exception.ErrorHandler;
 import io.perftest.exception.Result;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * Manager for configuration settings
+ * Manager for configuration settings.
+ * Uses an Enum-based Singleton pattern to avoid MS_EXPOSE_REP SpotBugs warnings.
  */
 @Slf4j
 public class ConfigManager {
     
-    private static ConfigManager instance;
+    /**
+     * Enum singleton holder for ConfigManager.
+     * Using an enum for the singleton pattern completely prevents issues with serialization
+     * and reflection, plus it avoids the MS_EXPOSE_REP SpotBugs warning.
+     */
+    private enum SingletonHolder {
+        INSTANCE;
+        
+        private final ConfigManager instance;
+        
+        SingletonHolder() {
+            instance = new ConfigManager();
+        }
+        
+        public ConfigManager getInstance() {
+            return instance;
+        }
+    }
     
-    @Getter
-    @Setter
-    private Map<String, Object> configMap = new HashMap<>();
+    // Configuration map to store settings
+    private final Map<String, Object> configMap = new HashMap<>();
     
     /**
      * Private constructor for singleton pattern
@@ -33,14 +49,43 @@ public class ConfigManager {
     }
     
     /**
-     * Get the singleton instance
+     * Get the singleton instance using the Enum-based singleton pattern
+     * which is thread-safe by design and immune to the MS_EXPOSE_REP warning.
+     * 
      * @return The ConfigManager instance
      */
-    public static synchronized ConfigManager getInstance() {
-        if (instance == null) {
-            instance = new ConfigManager();
+    public static ConfigManager getInstance() {
+        return SingletonHolder.INSTANCE.getInstance();
+    }
+    
+    /**
+     * Get a defensive copy of the configuration map.
+     * This returns an unmodifiable view of the map to prevent external modification.
+     * 
+     * @return An unmodifiable view of the configuration map
+     */
+    public Map<String, Object> getConfigMap() {
+        // Create a new HashMap and return an unmodifiable view of it
+        // This addresses the EI_EXPOSE_REP warning
+        return Collections.unmodifiableMap(new HashMap<>(configMap));
+    }
+    
+    /**
+     * Set the configuration map (uses a defensive copy)
+     * @param map The new configuration map
+     */
+    public void setConfigMap(Map<String, Object> map) {
+        if (map == null) {
+            configMap.clear();
+            return;
         }
-        return instance;
+        
+        // Create a defensive copy of the input map to prevent external modification
+        // This addresses the EI_EXPOSE_REP2 warning
+        Map<String, Object> defensiveCopy = new HashMap<>(map);
+        
+        configMap.clear();
+        configMap.putAll(defensiveCopy);
     }
     
     /**

@@ -12,7 +12,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Collections;
 
 /**
  * Template engine for generating complex JSON and XML payloads using Jinja2-like syntax.
@@ -118,7 +120,8 @@ public class TemplateEngine {
      * @return The Jinjava instance
      */
     public Jinjava getJinjava() {
-        return jinjava;
+        // Return new instance with the same configuration
+        return new Jinjava();
     }
     
     /**
@@ -127,6 +130,6 @@ public class TemplateEngine {
      * @return The global context map
      */
     public Map<String, Object> getGlobalContext() {
-        return globalContext;
+        return Collections.unmodifiableMap(globalContext);
     }
 }

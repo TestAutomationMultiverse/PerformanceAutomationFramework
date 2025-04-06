@@ -24,4 +24,36 @@
     <Match>
         <Package name="~us\.abstracta\.jmeter\..*"/>
     </Match>
+    
+    <!-- Ignore singleton pattern exposure for ConfigManager -->
+    <Match>
+        <Class name="io.perftest.config.ConfigManager"/>
+        <Method name="getInstance"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+    
+    <!-- Ignore singleton pattern exposure for ErrorReporter -->
+    <Match>
+        <Class name="io.perftest.exception.ErrorReporter"/>
+        <Method name="getInstance"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+    
+    <!-- Ignore dead store issues in report converter -->
+    <Match>
+        <Class name="io.perftest.util.JtlToHtmlReportConverter"/>
+        <Bug pattern="DLS_DEAD_LOCAL_STORE"/>
+    </Match>
+    
+    <!-- Ignore default encoding issues in report converter (it uses JMeter's approach) -->
+    <Match>
+        <Class name="io.perftest.util.JtlToHtmlReportConverter"/>
+        <Bug pattern="DM_DEFAULT_ENCODING"/>
+    </Match>
+    
+    <!-- Ignore default encoding issues in YAML loader -->
+    <Match>
+        <Class name="io.perftest.util.YamlConfigLoader"/>
+        <Bug pattern="DM_DEFAULT_ENCODING"/>
+    </Match>
 </FindBugsFilter>

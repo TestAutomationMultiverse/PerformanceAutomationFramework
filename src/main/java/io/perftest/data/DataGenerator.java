@@ -1,4 +1,6 @@
 package io.perftest.data;
+import java.util.Random;
+import java.util.Locale;
 
 import com.github.javafaker.Faker;
 import io.perftest.util.logger.TestLogger;
@@ -166,7 +168,7 @@ public class DataGenerator {
      * @return A list of unique values
      */
     public <T> List<T> uniqueValues(String category, Supplier<T> supplier, int count) {
-        return new Random(random.nextLong())
+        return random
                 .ints(0, Integer.MAX_VALUE)
                 .distinct()
                 .limit(count)
@@ -196,6 +198,6 @@ public class DataGenerator {
      * @return The Faker instance
      */
     public Faker getFaker() {
-        return faker;
+        return new Faker(new Random(faker.random().nextLong()));
     }
 }

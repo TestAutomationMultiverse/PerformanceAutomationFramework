@@ -2,8 +2,11 @@ package io.perftest.entities.request;
 
 import io.perftest.entities.base.Entity;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Collections;
 
 /**
  * Base class for all request entities
@@ -65,7 +68,8 @@ public class RequestEntity extends Entity {
      * @return HTTP headers as a map
      */
     public Map<String, String> getHeaders() {
-        return headers;
+        if (headers == null) return null;
+        return Collections.unmodifiableMap(headers);
     }
     
     /**

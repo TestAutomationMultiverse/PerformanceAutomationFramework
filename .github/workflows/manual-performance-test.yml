@@ -1,0 +1,289 @@
+name: Manual Performance Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      protocol:
+        description: 'Test protocol to run'
+        required: true
+        default: 'http'
+        type: choice
+        options:
+          - http
+          - graphql
+          - jdbc
+          - soap
+          - all
+          - html-demo
+          - full-demo
+      threads:
+        description: 'Number of threads'
+        required: true
+        default: '10'
+        type: number
+      ramp_up_seconds:
+        description: 'Ramp-up period in seconds'
+        required: true
+        default: '5'
+        type: number
+      duration_seconds:
+        description: 'Test duration in seconds'
+        required: true
+        default: '30'
+        type: number
+      iterations:
+        description: 'Number of iterations (0 for infinite)'
+        required: false
+        default: '0'
+        type: number
+      target_url:
+        description: 'Target URL or endpoint (for HTTP/GraphQL/SOAP)'
+        required: false
+        type: string
+      custom_config:
+        description: 'Path to custom config file (relative to repo root)'
+        required: false
+        type: string
+      threshold_assertions:
+        description: 'Enable performance threshold assertions'
+        required: false
+        default: 'false'
+        type: boolean
+      upload_report:
+        description: 'Upload report to GitHub Pages'
+        required: true
+        default: 'true'
+        type: boolean
+      notify_slack:
+        description: 'Send Slack notification with results'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  run-performance-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+    
+    - name: Build project
+      run: mvn -B clean package -DskipTests
+    
+    - name: Set test parameters
+      run: |
+        echo "PROTOCOL=${{ github.event.inputs.protocol }}" >> $GITHUB_ENV
+        echo "THREADS=${{ github.event.inputs.threads }}" >> $GITHUB_ENV
+        echo "RAMP_UP=${{ github.event.inputs.ramp_up_seconds }}" >> $GITHUB_ENV
+        echo "DURATION=${{ github.event.inputs.duration_seconds }}" >> $GITHUB_ENV
+        echo "ITERATIONS=${{ github.event.inputs.iterations }}" >> $GITHUB_ENV
+        echo "TARGET_URL=${{ github.event.inputs.target_url }}" >> $GITHUB_ENV
+        echo "CUSTOM_CONFIG=${{ github.event.inputs.custom_config }}" >> $GITHUB_ENV
+        echo "THRESHOLD_ASSERTIONS=${{ github.event.inputs.threshold_assertions }}" >> $GITHUB_ENV
+        
+        # Extract repository info for report links
+        REPO_OWNER=$(echo $GITHUB_REPOSITORY | cut -d '/' -f 1)
+        REPO_NAME=$(echo $GITHUB_REPOSITORY | cut -d '/' -f 2)
+        echo "REPO_OWNER=$REPO_OWNER" >> $GITHUB_ENV
+        echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+        
+        # Create timestamp for unique report folder
+        echo "TIMESTAMP=$(date +%Y%m%d_%H%M%S)" >> $GITHUB_ENV
+    
+    - name: Execute performance test
+      id: run_test
+      run: |
+        # Build command with parameters
+        CMD="./perftest.sh run $PROTOCOL --threads=$THREADS --ramp-up=$RAMP_UP --duration=$DURATION"
+        
+        # Add additional parameters if provided
+        if [ -n "$TARGET_URL" ]; then
+          CMD="$CMD --target=$TARGET_URL"
+        fi
+        
+        if [ "$ITERATIONS" -gt 0 ]; then
+          CMD="$CMD --iterations=$ITERATIONS"
+        fi
+        
+        if [ -n "$CUSTOM_CONFIG" ]; then
+          CMD="$CMD --config=$CUSTOM_CONFIG"
+        fi
+        
+        if [ "$THRESHOLD_ASSERTIONS" = "true" ]; then
+          CMD="$CMD --assert-thresholds"
+        fi
+        
+        echo "Running command: $CMD"
+        
+        # Run the test and capture exit code
+        $CMD
+        TEST_EXIT_CODE=$?
+        
+        # Set test result status
+        if [ $TEST_EXIT_CODE -eq 0 ]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+          echo "Test completed successfully ✅"
+        else
+          echo "status=failure" >> $GITHUB_OUTPUT
+          echo "Test completed with errors ❌"
+        fi
+        
+        # Find the most recent results directory for reports
+        JTL_DIR=$(find target/jtl-results -type d -name "${PROTOCOL}_*" | sort | tail -n 1)
+        HTML_DIR=$(find target/html-reports -type d -name "${PROTOCOL}_*" | sort | tail -n 1)
+        
+        echo "JTL_DIR=$JTL_DIR" >> $GITHUB_ENV
+        echo "HTML_DIR=$HTML_DIR" >> $GITHUB_ENV
+        
+        # Extract basic statistics for summary
+        if [ -f "$JTL_DIR/results.jtl" ]; then
+          # Use simple shell commands to extract basic stats from JTL file
+          TOTAL_REQUESTS=$(wc -l < "$JTL_DIR/results.jtl")
+          ERROR_COUNT=$(grep -c "false" "$JTL_DIR/results.jtl" || echo "0")
+          SUCCESS_RATE=$(( 100 - (ERROR_COUNT * 100 / TOTAL_REQUESTS) ))
+          
+          echo "TOTAL_REQUESTS=$TOTAL_REQUESTS" >> $GITHUB_ENV
+          echo "ERROR_COUNT=$ERROR_COUNT" >> $GITHUB_ENV
+          echo "SUCCESS_RATE=$SUCCESS_RATE" >> $GITHUB_ENV
+        fi
+        
+        exit $TEST_EXIT_CODE
+      continue-on-error: true
+    
+    - name: Upload JTL results
+      uses: actions/upload-artifact@v4
+      with:
+        name: jtl-results-${{ env.PROTOCOL }}-${{ env.TIMESTAMP }}
+        path: ${{ env.JTL_DIR }}
+        retention-days: 30
+    
+    - name: Upload HTML reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: html-reports-${{ env.PROTOCOL }}-${{ env.TIMESTAMP }}
+        path: ${{ env.HTML_DIR }}
+        retention-days: 30
+    
+    - name: Deploy HTML reports to GitHub Pages
+      if: ${{ github.event.inputs.upload_report == 'true' }}
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        folder: ${{ env.HTML_DIR }}
+        branch: gh-pages
+        target-folder: reports/${{ env.PROTOCOL }}_${{ env.TIMESTAMP }}
+    
+    - name: Create performance report summary
+      run: |
+        echo "## Performance Test Results 📊" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Add status badge
+        if [ "${{ steps.run_test.outputs.status }}" == "success" ]; then
+          echo "**Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "**Status:** ❌ Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Parameters table
+        echo "### Test Parameters" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+        echo "| Protocol | $PROTOCOL |" >> $GITHUB_STEP_SUMMARY
+        echo "| Threads | $THREADS |" >> $GITHUB_STEP_SUMMARY
+        echo "| Ramp-up (seconds) | $RAMP_UP |" >> $GITHUB_STEP_SUMMARY
+        echo "| Duration (seconds) | $DURATION |" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "$ITERATIONS" -gt 0 ]; then
+          echo "| Iterations | $ITERATIONS |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ -n "$TARGET_URL" ]; then
+          echo "| Target URL | $TARGET_URL |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ -n "$CUSTOM_CONFIG" ]; then
+          echo "| Custom Config | $CUSTOM_CONFIG |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "| Timestamp | $(basename $HTML_DIR) |" >> $GITHUB_STEP_SUMMARY
+        
+        # Stats table
+        if [ -n "$TOTAL_REQUESTS" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Total Requests | $TOTAL_REQUESTS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Errors | $ERROR_COUNT |" >> $GITHUB_STEP_SUMMARY
+          echo "| Success Rate | $SUCCESS_RATE% |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Links
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Links" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ github.event.inputs.upload_report == 'true' }}" == "true" ]; then
+          REPORT_BASENAME=$(basename $HTML_DIR)
+          echo "📈 [View HTML Report](https://$REPO_OWNER.github.io/$REPO_NAME/reports/${REPORT_BASENAME}/index.html)" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "📦 [Download JTL Results](https://github.com/$REPO_OWNER/$REPO_NAME/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+        echo "📊 [Download HTML Report](https://github.com/$REPO_OWNER/$REPO_NAME/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Send Slack notification
+      if: ${{ github.event.inputs.notify_slack == 'true' }}
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ steps.run_test.outputs.status }}
+        fields: repo,message,commit,author,action,eventName,workflow
+        text: |
+          Performance Test Results: ${{ steps.run_test.outputs.status == 'success' && 'Passed ✅' || 'Failed ❌' }}
+          Protocol: ${{ env.PROTOCOL }}
+          Threads: ${{ env.THREADS }}
+          Duration: ${{ env.DURATION }}s
+          Success Rate: ${{ env.SUCCESS_RATE }}%
+          
+          View full report: https://${{ env.REPO_OWNER }}.github.io/${{ env.REPO_NAME }}/reports/$(basename ${{ env.HTML_DIR }})/index.html
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      continue-on-error: true
+  
+  historical-comparison:
+    needs: run-performance-test
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.upload_report == 'true' }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: gh-pages
+    
+    - name: List historical test results
+      run: |
+        if [ -d "reports" ]; then
+          echo "## Historical Performance Comparison" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Date | Protocol | Report Link |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
+          
+          # List the most recent 5 reports in reverse chronological order
+          ls -ldt reports/*/ 2>/dev/null | head -5 | while read dir; do
+            DIR_NAME=$(basename "$dir")
+            PROTOCOL=$(echo $DIR_NAME | cut -d '_' -f 1)
+            TIMESTAMP=$(echo $DIR_NAME | cut -d '_' -f 2-3)
+            READABLE_DATE=$(date -d "${TIMESTAMP//_/ }" "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "$TIMESTAMP")
+            
+            echo "| $READABLE_DATE | $PROTOCOL | [View Report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/reports/$DIR_NAME/index.html) |" >> $GITHUB_STEP_SUMMARY
+          done
+        else
+          echo "No previous test results found for comparison." >> $GITHUB_STEP_SUMMARY
+        fi
