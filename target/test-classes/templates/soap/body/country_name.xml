@@ -1,3 +1,0 @@
-<CountryName xmlns="http://www.oorsprong.org/websamples.countryinfo">
-  <sCountryISOCode>{{ countryCode }}</sCountryISOCode>
-</CountryName>

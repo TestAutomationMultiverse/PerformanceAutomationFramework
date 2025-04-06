@@ -1,7 +1,0 @@
-{
-  "limit": 10,
-  "offset": 0,
-  "filters": {
-    "active": true
-  }
-}

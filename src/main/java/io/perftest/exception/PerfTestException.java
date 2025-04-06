@@ -7,6 +7,8 @@ import lombok.Getter;
  */
 public class PerfTestException extends RuntimeException {
     
+    private static final long serialVersionUID = 1L;
+    
     @Getter
     private final ErrorCode errorCode;
     

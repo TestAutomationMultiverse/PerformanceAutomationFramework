@@ -1,9 +1,0 @@
-query {
-  getCrocodiles {
-    id
-    name
-    sex
-    age
-    dateOfBirth
-  }
-}

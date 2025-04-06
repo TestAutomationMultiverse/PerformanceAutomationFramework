@@ -61,7 +61,7 @@ public class ErrorHandler {
      * @throws PerfTestException If validation fails
      */
     public static void validateNotEmpty(String value, ErrorCode errorCode, String errorMessage) {
-        if (value == null || value.isEmpty()) {
+        if (value == null || value.trim().isEmpty()) {
             throw new PerfTestException(errorCode, errorMessage);
         }
     }
@@ -107,8 +107,7 @@ public class ErrorHandler {
         try {
             return supplier.get();
         } catch (IOException e) {
-            // Re-throw IOExceptions
-            logger.warn("{}: {}", errorMessage, e.getMessage());
+            // Let IOExceptions propagate
             throw e;
         } catch (Exception e) {
             logger.error("{}: {}", errorMessage, e.getMessage(), e);
@@ -117,7 +116,7 @@ public class ErrorHandler {
     }
     
     /**
-     * Execute a supplier with error handling, handling a specific exception type
+     * Execute a supplier with specific exception handling
      * @param supplier The supplier to execute
      * @param exceptionClass The type of exception to handle
      * @param errorCode Error code to use if an exception occurs
@@ -136,7 +135,10 @@ public class ErrorHandler {
         try {
             return supplier.get();
         } catch (Exception e) {
-            if (exceptionClass.isInstance(e)) {
+            // Check if this is the expected exception class or if the cause is that exception
+            if (exceptionClass.isInstance(e) || 
+                (e.getCause() != null && exceptionClass.isInstance(e.getCause())) || 
+                (e instanceof PerfTestException && ((PerfTestException)e).getErrorCode() == ErrorCode.IO_ERROR)) {
                 logger.error("{}: {}", errorMessage, e.getMessage(), e);
                 throw new PerfTestException(errorCode, errorMessage + ": " + e.getMessage(), e);
             } else {

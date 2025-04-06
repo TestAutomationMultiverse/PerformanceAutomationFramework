@@ -1,7 +1,7 @@
 package io.perftest.graphql_tests;
 
 import io.perftest.components.graphql.GraphQLComponent;
-import io.perftest.core.BaseTest;
+import io.perftest.core.test.BaseTest;
 import io.perftest.engine.TestEngine;
 import io.perftest.entities.request.GraphQLRequestEntity;
 import io.perftest.systems.TestSystem;

@@ -2,6 +2,7 @@ package io.perftest.exception;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -17,7 +18,9 @@ public class ErrorReporter {
     /**
      * Error entry class for storing error information
      */
-    public static class ErrorEntry {
+    public static class ErrorEntry implements Serializable {
+        private static final long serialVersionUID = 1L;
+        
         private final ErrorCode errorCode;
         private final String message;
         private final Throwable exception;

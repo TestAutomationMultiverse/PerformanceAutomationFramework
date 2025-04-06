@@ -1,4 +1,0 @@
-<{{ operationName }} xmlns="http://tempuri.org/">
-  <{{ param1Name }}>{{ value1 }}</{{ param1Name }}>
-  <{{ param2Name }}>{{ value2 }}</{{ param2Name }}>
-</{{ operationName }}>

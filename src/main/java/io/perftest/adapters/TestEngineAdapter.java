@@ -53,10 +53,7 @@ public class TestEngineAdapter {
         testEngine.addRequest(httpRequestEntity);
         
         // Run the test
-        testEngine.run();
-        
-        // Using reflection-safe TestPlanStats creation to avoid compatibility issues
-        return createEmptyTestPlanStats();
+        return testEngine.run();
     }
     
     /**
@@ -76,32 +73,5 @@ public class TestEngineAdapter {
         httpRequestEntity.setAssertions(requestEntity.getAssertions());
         
         return httpRequestEntity;
-    }
-    
-    /**
-     * Create an empty TestPlanStats object in a version-compatible way
-     * 
-     * @return Empty TestPlanStats object
-     */
-    private TestPlanStats createEmptyTestPlanStats() {
-        try {
-            // First try the of(null) method which should be available in all versions
-            try {
-                java.lang.reflect.Method ofMethod = TestPlanStats.class.getMethod("of", Object.class);
-                return (TestPlanStats) ofMethod.invoke(null, new Object[]{null});
-            } catch (NoSuchMethodException e) {
-                // Then try empty() method which might be available in some versions
-                try {
-                    java.lang.reflect.Method emptyMethod = TestPlanStats.class.getMethod("empty");
-                    return (TestPlanStats) emptyMethod.invoke(null);
-                } catch (NoSuchMethodException ex) {
-                    // If both fail, create a minimal instance with default constructor
-                    return TestPlanStats.class.getDeclaredConstructor().newInstance();
-                }
-            }
-        } catch (Exception e) {
-            logger.error("Could not create TestPlanStats instance", e);
-            return null;
-        }
     }
 }

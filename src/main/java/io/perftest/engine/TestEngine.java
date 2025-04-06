@@ -1,35 +1,7 @@
 package io.perftest.engine;
 
-import java.io.IOException;
-import io.perftest.components.jdbc.JdbcComponent;
-import io.perftest.components.http.HttpComponent;
-import io.perftest.components.graphql.GraphQLComponent;
-import io.perftest.components.soap.SoapComponent;
-import io.perftest.components.xml.XmlComponent;
-import io.perftest.systems.TestSystem;
-import io.perftest.entities.request.GraphQLRequestEntity;
-import io.perftest.entities.request.HttpRequestEntity;
-import io.perftest.entities.request.JdbcRequestEntity;
-import io.perftest.entities.request.RequestEntity;
-import io.perftest.entities.request.SoapRequestEntity;
-import io.perftest.entities.request.XmlRequestEntity;
-import io.perftest.exception.ErrorCode;
-import io.perftest.exception.ErrorHandler;
-import io.perftest.exception.PerfTestException;
-import io.perftest.exception.Result;
-import io.perftest.exception.TestExecutionException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import us.abstracta.jmeter.javadsl.core.DslTestPlan;
-import us.abstracta.jmeter.javadsl.core.TestPlanStats;
-import us.abstracta.jmeter.javadsl.core.listeners.HtmlReporter;
-import us.abstracta.jmeter.javadsl.core.listeners.JtlWriter;
-import us.abstracta.jmeter.javadsl.core.threadgroups.BaseThreadGroup;
-import us.abstracta.jmeter.javadsl.core.threadgroups.DslDefaultThreadGroup;
-import us.abstracta.jmeter.javadsl.prometheus.DslPrometheusListener;
+import static us.abstracta.jmeter.javadsl.JmeterDsl.*;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,738 +10,582 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-import static us.abstracta.jmeter.javadsl.JmeterDsl.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import io.perftest.components.graphql.GraphQLComponent;
+import io.perftest.components.http.HttpComponent;
+import io.perftest.components.jdbc.JdbcComponent;
+import io.perftest.components.soap.SoapComponent;
+import io.perftest.components.xml.XmlComponent;
+import io.perftest.entities.request.GraphQLRequestEntity;
+import io.perftest.entities.request.HttpRequestEntity;
+import io.perftest.entities.request.JdbcRequestEntity;
+import io.perftest.entities.request.RequestEntity;
+import io.perftest.entities.request.SoapRequestEntity;
+import io.perftest.entities.request.XmlRequestEntity;
+import io.perftest.exception.ErrorCode;
+import io.perftest.exception.Result;
+import io.perftest.exception.TestExecutionException;
+import io.perftest.systems.TestSystem;
+import io.perftest.util.JMeterLogConfiguration;
+import us.abstracta.jmeter.javadsl.core.DslTestPlan;
+import us.abstracta.jmeter.javadsl.core.TestPlanStats;
+import us.abstracta.jmeter.javadsl.core.threadgroups.BaseThreadGroup;
+import us.abstracta.jmeter.javadsl.core.threadgroups.BaseThreadGroup.ThreadGroupChild;
 
 /**
- * Test engine for running performance tests
+ * The TestEngine is the main orchestrator for performance test execution.
+ * 
+ * <p>This class provides a high-level API for configuring and executing performance tests
+ * using the JMeter DSL. It serves as the integration point between the ECS architecture
+ * and the underlying JMeter test execution engine.</p>
+ * 
+ * <p>TestEngine is responsible for:</p>
+ * <ul>
+ *     <li>Managing test configuration (threads, iterations, ramp-up time)</li>
+ *     <li>Registering components for different protocol handlers</li>
+ *     <li>Coordinating the request processing pipeline</li>
+ *     <li>Executing the test and collecting results</li>
+ *     <li>Managing test result files and directories</li>
+ * </ul>
+ * 
+ * <p>Example usage:</p>
+ * <pre>{@code
+ * TestEngine engine = new TestEngine();
+ * engine.setThreads(10)
+ *       .setIterations(100)
+ *       .setRampUp(Duration.ofSeconds(30));
+ *       
+ * HttpRequestEntity request = new HttpRequestEntity()
+ *       .setUrl("https://example.com/api")
+ *       .setMethod("GET");
+ *       
+ * engine.addRequest(request);
+ * TestPlanStats stats = engine.runTest();
+ * }</pre>
  */
 public class TestEngine {
     private static final Logger logger = LoggerFactory.getLogger(TestEngine.class);
     
     private final TestSystem testSystem;
-    private final List<RequestEntity> requests = new ArrayList<>();
+    private final List<RequestEntity> requests;
+    private final Map<String, Path> resultPaths;
+    
     private int threads = 1;
     private int iterations = 1;
-    private Duration rampUp = Duration.ofSeconds(1);
+    private Duration rampUp = Duration.ofSeconds(0);
+    private boolean initialized = false;
+    private String protocolName = "default";
+    private String testPlanName = "Test Plan";
+    
+    // Modifiers for different request types
     private Consumer<HttpRequestEntity> httpModifier;
     private Consumer<GraphQLRequestEntity> graphqlModifier;
     private Consumer<XmlRequestEntity> xmlModifier;
     private Consumer<SoapRequestEntity> soapModifier;
     private Consumer<JdbcRequestEntity> jdbcModifier;
-    private String testPlanName = "Performance Test";
-    private boolean shouldGenerateReports = true;
-    private String protocolName = "default";
     
     /**
-     * Create a new test engine with default TestSystem
+     * Creates a new TestEngine instance with default TestSystem.
+     * 
+     * <p>The constructor initializes a TestSystem and registers default components
+     * for HTTP, GraphQL, XML, SOAP, and JDBC protocols.</p>
      */
     public TestEngine() {
-        this.testSystem = new TestSystem();
-        
-        // Register default components
-        this.testSystem.addComponent(HttpRequestEntity.class, new HttpComponent());
-        this.testSystem.addComponent(GraphQLRequestEntity.class, new GraphQLComponent());
-        this.testSystem.addComponent(XmlRequestEntity.class, new XmlComponent());
-        this.testSystem.addComponent(SoapRequestEntity.class, new SoapComponent());
-        this.testSystem.addComponent(JdbcRequestEntity.class, new JdbcComponent());
+        this(new TestSystem());
     }
     
     /**
-     * Create a new test engine
+     * Creates a new TestEngine instance with a provided TestSystem.
      * 
-     * @param testSystem The test system to use for processing requests
+     * <p>This constructor allows for dependency injection of a TestSystem instance.
+     * It will reuse the provided TestSystem without registering additional components.</p>
+     * 
+     * @param testSystem The TestSystem to use
      */
     public TestEngine(TestSystem testSystem) {
-        ErrorHandler.validateNotNull(testSystem, ErrorCode.TEST_SETUP_ERROR, "TestSystem cannot be null");
         this.testSystem = testSystem;
-    }
-    
-    /**
-     * Add a request to the test plan
-     * 
-     * @param request The request to add
-     * @throws PerfTestException If the request is null
-     */
-    public void addRequest(RequestEntity request) {
-        ErrorHandler.validateNotNull(request, ErrorCode.TEST_SETUP_ERROR, "Request cannot be null");
-        logger.info("Adding request to test plan: {}", request.getClass().getSimpleName());
-        requests.add(request);
+        this.requests = new ArrayList<>();
+        this.resultPaths = new HashMap<>();
         
-        // Set protocol name based on the first request added
-        if (protocolName.equals("default") && requests.size() == 1) {
-            if (request instanceof HttpRequestEntity) {
-                protocolName = "http";
-            } else if (request instanceof GraphQLRequestEntity) {
-                protocolName = "graphql";
-            } else if (request instanceof SoapRequestEntity) {
-                protocolName = "soap";
-            } else if (request instanceof XmlRequestEntity) {
-                protocolName = "xml";
-            } else if (request instanceof JdbcRequestEntity) {
-                protocolName = "jdbc";
-            }
+        // Register default components if TestSystem is empty
+        if (testSystem.getComponentCount() == 0) {
+            registerDefaultComponents();
         }
     }
     
     /**
-     * Set the protocol name manually
+     * Registers the default components for various protocols.
      * 
-     * @param protocolName Protocol name
+     * <p>This method is called during TestEngine initialization to set up the
+     * standard protocol handlers. It registers components for HTTP, GraphQL,
+     * XML, SOAP, and JDBC protocols.</p>
      */
-    public void setProtocolName(String protocolName) {
-        ErrorHandler.validateNotNull(protocolName, ErrorCode.TEST_SETUP_ERROR, "Protocol name cannot be null");
-        this.protocolName = protocolName;
+    private void registerDefaultComponents() {
+        // Register HTTP component
+        testSystem.addComponent(HttpRequestEntity.class, new HttpComponent());
+        
+        // Register GraphQL component
+        testSystem.addComponent(GraphQLRequestEntity.class, new GraphQLComponent());
+        
+        // Register XML component
+        testSystem.addComponent(XmlRequestEntity.class, new XmlComponent());
+        
+        // Register SOAP component
+        testSystem.addComponent(SoapRequestEntity.class, new SoapComponent());
+        
+        // Register JDBC component
+        testSystem.addComponent(JdbcRequestEntity.class, new JdbcComponent());
+        
+        initialized = true;
     }
     
     /**
-     * Get the current protocol name
+     * Set the number of threads (virtual users) for the test.
      * 
-     * @return Protocol name
+     * <p>This sets the number of concurrent threads that will execute the test plan.
+     * Each thread will execute the test iterations, simulating a virtual user.</p>
+     * 
+     * @param threads Number of threads (virtual users)
+     * @return This TestEngine instance for method chaining
+     */
+    public TestEngine setThreads(int threads) {
+        this.threads = threads;
+        return this;
+    }
+    
+    /**
+     * Get the number of threads configured for the test.
+     * 
+     * @return Number of threads (virtual users)
+     */
+    public int getThreads() {
+        return threads;
+    }
+    
+    /**
+     * Set the number of iterations for the test.
+     * 
+     * <p>This sets the number of times each thread will execute the test samplers.
+     * The total number of requests will be threads * iterations * number of samplers.</p>
+     * 
+     * @param iterations Number of iterations per thread
+     * @return This TestEngine instance for method chaining
+     */
+    public TestEngine setIterations(int iterations) {
+        this.iterations = iterations;
+        return this;
+    }
+    
+    /**
+     * Get the number of iterations configured for the test.
+     * 
+     * @return Number of iterations per thread
+     */
+    public int getIterations() {
+        return iterations;
+    }
+    
+    /**
+     * Set the ramp-up period for the test.
+     * 
+     * <p>This sets the time period over which JMeter will start all threads.
+     * For example, if you have 100 threads and a ramp-up period of 50 seconds,
+     * then JMeter will take 50 seconds to start all 100 threads, with each thread
+     * starting 0.5 seconds after the previous thread.</p>
+     * 
+     * @param rampUp The ramp-up period as a Duration
+     * @return This TestEngine instance for method chaining
+     */
+    public TestEngine setRampUp(Duration rampUp) {
+        this.rampUp = rampUp;
+        return this;
+    }
+    
+    /**
+     * Get the ramp-up period configured for the test.
+     * 
+     * @return The ramp-up period as a Duration
+     */
+    public Duration getRampUp() {
+        return rampUp;
+    }
+    
+    /**
+     * Set the protocol name for reporting purposes.
+     * 
+     * <p>This name is used in log files and results directories to identify
+     * the protocol being tested (e.g., "http", "graphql", "jdbc", etc.).</p>
+     * 
+     * @param protocolName The protocol name
+     * @return This TestEngine instance for method chaining
+     */
+    public TestEngine setProtocolName(String protocolName) {
+        this.protocolName = protocolName;
+        return this;
+    }
+    
+    /**
+     * Get the protocol name configured for reporting.
+     * 
+     * @return The protocol name
      */
     public String getProtocolName() {
         return protocolName;
     }
     
     /**
-     * Set the number of threads (virtual users) for the test
+     * Set the test plan name.
      * 
-     * @param threads Number of threads
-     * @throws PerfTestException If threads is less than 1
-     */
-    public void setThreads(int threads) {
-        ErrorHandler.validate(threads > 0, ErrorCode.TEST_SETUP_ERROR, "Threads must be greater than 0");
-        this.threads = threads;
-    }
-    
-    /**
-     * Set the number of iterations for the test
+     * <p>This name is used in JMeter reports to identify the test plan.
+     * It's primarily for documentation purposes.</p>
      * 
-     * @param iterations Number of iterations
-     * @throws PerfTestException If iterations is less than 1
+     * @param testPlanName The test plan name
+     * @return This TestEngine instance for method chaining
      */
-    public void setIterations(int iterations) {
-        ErrorHandler.validate(iterations > 0, ErrorCode.TEST_SETUP_ERROR, "Iterations must be greater than 0");
-        this.iterations = iterations;
-    }
-    
-    /**
-     * Set the ramp-up period for the test
-     * 
-     * @param rampUp Ramp-up duration
-     * @throws PerfTestException If rampUp is null
-     */
-    public void setRampUp(Duration rampUp) {
-        ErrorHandler.validateNotNull(rampUp, ErrorCode.TEST_SETUP_ERROR, "Ramp-up duration cannot be null");
-        this.rampUp = rampUp;
-    }
-    
-    /**
-     * Set a modifier function for HTTP requests
-     * 
-     * @param httpModifier HTTP request modifier function
-     */
-    public void setHttpModifier(Consumer<HttpRequestEntity> httpModifier) {
-        this.httpModifier = httpModifier;
-    }
-    
-    /**
-     * Set a modifier function for GraphQL requests
-     * 
-     * @param graphqlModifier GraphQL request modifier function
-     */
-    public void setGraphqlModifier(Consumer<GraphQLRequestEntity> graphqlModifier) {
-        this.graphqlModifier = graphqlModifier;
-    }
-    
-    /**
-     * Set a modifier function for XML requests
-     * 
-     * @param xmlModifier XML request modifier function
-     */
-    public void setXmlModifier(Consumer<XmlRequestEntity> xmlModifier) {
-        this.xmlModifier = xmlModifier;
-    }
-    
-    /**
-     * Set a modifier function for SOAP requests
-     * 
-     * @param soapModifier SOAP request modifier function
-     */
-    public void setSoapModifier(Consumer<SoapRequestEntity> soapModifier) {
-        this.soapModifier = soapModifier;
-    }
-    
-    /**
-     * Set a modifier function for JDBC requests
-     * 
-     * @param jdbcModifier JDBC request modifier function
-     */
-    public void setJdbcModifier(Consumer<JdbcRequestEntity> jdbcModifier) {
-        this.jdbcModifier = jdbcModifier;
-    }
-    
-    /**
-     * Set the test plan name
-     * 
-     * @param testPlanName Test plan name
-     * @throws PerfTestException If testPlanName is null
-     */
-    public void setTestPlanName(String testPlanName) {
-        ErrorHandler.validateNotNull(testPlanName, ErrorCode.TEST_SETUP_ERROR, "Test plan name cannot be null");
+    public TestEngine setTestPlanName(String testPlanName) {
         this.testPlanName = testPlanName;
+        return this;
     }
     
     /**
-     * Set whether to generate reports
+     * Get the test plan name.
      * 
-     * @param shouldGenerateReports True to generate reports
+     * @return The test plan name
      */
-    public void setShouldGenerateReports(boolean shouldGenerateReports) {
-        this.shouldGenerateReports = shouldGenerateReports;
+    public String getTestPlanName() {
+        return testPlanName;
     }
-
+    
     /**
-     * Create directories for test results
+     * Add a request to the test plan.
      * 
-     * @param protocolName Protocol name for the report
-     * @return Path to the test results file
-     * @throws PerfTestException If an error occurs creating the directories
+     * <p>The request will be processed by the appropriate component based on its type
+     * when the test is executed.</p>
+     * 
+     * @param request The RequestEntity to add
+     * @return This TestEngine instance for method chaining
      */
-    private Path createResultsDirectory(String protocolName) {
-        try {
-            // Create directory structure for HTML reports
-            Path htmlReportDir = Paths.get("target", "html-reports", protocolName);
-            Files.createDirectories(htmlReportDir);
-            
-            // Create directory for JTL files
-            Path jtlDir = Paths.get("target", "jtl-results");
-            Files.createDirectories(jtlDir);
-            
-            // Create test-specific directory with timestamp and UUID
-            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH-mm-ss"));
-            String uniqueId = UUID.randomUUID().toString();
-            Path testSpecificDir = jtlDir.resolve(protocolName + "-test-results.jtl")
-                    .resolve(timestamp + " " + uniqueId + ".jtl");
-            Files.createDirectories(testSpecificDir.getParent());
-            
-            return testSpecificDir;
-        } catch (IOException e) {
-            throw new PerfTestException(ErrorCode.REPORTING_ERROR, "Failed to create results directory", e);
-        }
+    public TestEngine addRequest(RequestEntity request) {
+        requests.add(request);
+        return this;
     }
     
     /**
-     * Execute an HTTP test with the given request entity
+     * Set a modifier function for HTTP requests.
      * 
-     * @param requestEntity The HTTP request entity
-     * @param threads Number of threads (users)
-     * @param iterations Number of iterations per thread
-     * @return Test statistics
-     * @throws PerfTestException If an error occurs during test execution
+     * <p>This modifier will be applied to each HttpRequestEntity before it's processed
+     * by the HttpComponent. It can be used to add common headers, query parameters,
+     * or other request modifications.</p>
+     * 
+     * @param modifier A Consumer function that modifies HttpRequestEntity instances
+     * @return This TestEngine instance for method chaining
      */
-    public TestPlanStats executeHttpTest(HttpRequestEntity requestEntity, int threads, int iterations) throws IOException {
-        ErrorHandler.validateNotNull(requestEntity, ErrorCode.TEST_EXECUTION_ERROR, "HTTP request entity cannot be null");
-        ErrorHandler.validate(threads > 0, ErrorCode.TEST_EXECUTION_ERROR, "Threads must be greater than 0");
-        ErrorHandler.validate(iterations > 0, ErrorCode.TEST_EXECUTION_ERROR, "Iterations must be greater than 0");
-        
-        logger.info("Executing HTTP test: {} with {} threads, {} iterations", 
-                requestEntity.getProperty("name", "HTTP Request"), threads, iterations);
-        
-        // Clear previous requests
-        requests.clear();
-        
-        // Set protocol name
-        protocolName = "http";
-        
-        // Set thread and iteration count
-        this.threads = threads;
-        this.iterations = iterations;
-        
-        // Add the request
-        addRequest(requestEntity);
-        
-        return ErrorHandler.executeWithIOHandling(() -> {
-            // Build samplers
-            BaseThreadGroup.ThreadGroupChild[] samplers = buildSamplers();
-            
-            // Create thread group
-            DslDefaultThreadGroup threadGroup = threadGroup()
-                .rampTo(threads, rampUp);
-            
-            // Add samplers to thread group
-            if (samplers.length > 0) {
-                threadGroup = threadGroup.children(samplers);
-            }
-            
-            // Create results directory and file
-            Path resultsFile = createResultsDirectory(protocolName);
-            logger.info("JTL results will be saved to: {}", resultsFile);
-            
-            // Create JTL writer for saving results
-            JtlWriter jtlWriter = jtlWriter(resultsFile.toString());
-            // Create Prometheus backend listener for real-time monitoring
-            DslPrometheusListener prometheusListener = DslPrometheusListener.prometheusListener();
-            logger.info("Prometheus metrics will be exposed on port 9270");
-    
-            
-            // Run the test with JTL writer
-            TestPlanStats stats = testPlan(
-                    threadGroup,
-                    jtlWriter,
-                    prometheusListener
-                ).run();
-            
-            // Log that this is where we would generate HTML report
-            logger.info("JTL file created at: {}. Use JMeter to convert to HTML report", resultsFile);
-            
-            return stats;
-        }, ErrorCode.TEST_EXECUTION_ERROR, "Error executing HTTP test", logger);
+    public TestEngine setHttpRequestModifier(Consumer<HttpRequestEntity> modifier) {
+        this.httpModifier = modifier;
+        return this;
     }
     
     /**
-     * Execute a GraphQL test with the given request entity
+     * Set a modifier function for GraphQL requests.
      * 
-     * @param requestEntity The GraphQL request entity
-     * @param threads Number of threads (users)
-     * @param iterations Number of iterations per thread
-     * @return Test statistics
-     * @throws PerfTestException If an error occurs during test execution
+     * <p>This modifier will be applied to each GraphQLRequestEntity before it's processed
+     * by the GraphQLComponent. It can be used to add common headers, variables,
+     * or other request modifications.</p>
+     * 
+     * @param modifier A Consumer function that modifies GraphQLRequestEntity instances
+     * @return This TestEngine instance for method chaining
      */
-    public TestPlanStats executeGraphQLTest(GraphQLRequestEntity requestEntity, int threads, int iterations) throws IOException {
-        ErrorHandler.validateNotNull(requestEntity, ErrorCode.TEST_EXECUTION_ERROR, "GraphQL request entity cannot be null");
-        ErrorHandler.validate(threads > 0, ErrorCode.TEST_EXECUTION_ERROR, "Threads must be greater than 0");
-        ErrorHandler.validate(iterations > 0, ErrorCode.TEST_EXECUTION_ERROR, "Iterations must be greater than 0");
-        
-        logger.info("Executing GraphQL test: {} with {} threads, {} iterations", 
-                requestEntity.getProperty("name", "GraphQL Request"), threads, iterations);
-        
-        // Clear previous requests
-        requests.clear();
-        
-        // Set protocol name
-        protocolName = "graphql";
-        
-        // Set thread and iteration count
-        this.threads = threads;
-        this.iterations = iterations;
-        
-        // Add the request
-        addRequest(requestEntity);
-        
-        return ErrorHandler.executeWithIOHandling(() -> {
-            // Build samplers
-            BaseThreadGroup.ThreadGroupChild[] samplers = buildSamplers();
-            
-            // Create thread group
-            DslDefaultThreadGroup threadGroup = threadGroup()
-                .rampTo(threads, rampUp);
-                
-            // Add samplers to thread group
-            if (samplers.length > 0) {
-                threadGroup = threadGroup.children(samplers);
-            }
-            
-            // Create results directory and file
-            Path resultsFile = createResultsDirectory(protocolName);
-            logger.info("JTL results will be saved to: {}", resultsFile);
-            
-            // Create JTL writer for saving results
-            JtlWriter jtlWriter = jtlWriter(resultsFile.toString());
-            // Create Prometheus backend listener for real-time monitoring
-            DslPrometheusListener prometheusListener = DslPrometheusListener.prometheusListener();
-            logger.info("Prometheus metrics will be exposed on port 9270");
-    
-            
-            // Run the test with JTL writer
-            TestPlanStats stats = testPlan(
-                    threadGroup,
-                    jtlWriter,
-                    prometheusListener
-                ).run();
-            
-            // Log that this is where we would generate HTML report
-            logger.info("JTL file created at: {}. Use JMeter to convert to HTML report", resultsFile);
-            
-            return stats;
-        }, ErrorCode.TEST_EXECUTION_ERROR, "Error executing GraphQL test", logger);
+    public TestEngine setGraphQLRequestModifier(Consumer<GraphQLRequestEntity> modifier) {
+        this.graphqlModifier = modifier;
+        return this;
     }
     
     /**
-     * Execute a SOAP test with the given request entity
+     * Set a modifier function for XML requests.
      * 
-     * @param requestEntity The SOAP request entity
-     * @param threads Number of threads (users)
-     * @param iterations Number of iterations per thread
-     * @return Test statistics
-     * @throws PerfTestException If an error occurs during test execution
+     * <p>This modifier will be applied to each XmlRequestEntity before it's processed
+     * by the XmlComponent. It can be used to add common headers, XML attributes,
+     * or other request modifications.</p>
+     * 
+     * @param modifier A Consumer function that modifies XmlRequestEntity instances
+     * @return This TestEngine instance for method chaining
      */
-    public TestPlanStats executeSoapTest(SoapRequestEntity requestEntity, int threads, int iterations) throws IOException {
-        ErrorHandler.validateNotNull(requestEntity, ErrorCode.TEST_EXECUTION_ERROR, "SOAP request entity cannot be null");
-        ErrorHandler.validate(threads > 0, ErrorCode.TEST_EXECUTION_ERROR, "Threads must be greater than 0");
-        ErrorHandler.validate(iterations > 0, ErrorCode.TEST_EXECUTION_ERROR, "Iterations must be greater than 0");
-        
-        logger.info("Executing SOAP test: {} with {} threads, {} iterations", 
-                requestEntity.getProperty("name", "SOAP Request"), threads, iterations);
-        
-        // Clear previous requests
-        requests.clear();
-        
-        // Set protocol name
-        protocolName = "soap";
-        
-        // Set thread and iteration count
-        this.threads = threads;
-        this.iterations = iterations;
-        
-        // Add the request
-        addRequest(requestEntity);
-        
-        return ErrorHandler.executeWithIOHandling(() -> {
-            // Build samplers
-            BaseThreadGroup.ThreadGroupChild[] samplers = buildSamplers();
-            
-            // Create thread group
-            DslDefaultThreadGroup threadGroup = threadGroup()
-                .rampTo(threads, rampUp);
-                
-            // Add samplers to thread group
-            if (samplers.length > 0) {
-                threadGroup = threadGroup.children(samplers);
-            }
-            
-            // Create results directory and file
-            Path resultsFile = createResultsDirectory(protocolName);
-            logger.info("JTL results will be saved to: {}", resultsFile);
-            
-            // Create JTL writer for saving results
-            JtlWriter jtlWriter = jtlWriter(resultsFile.toString());
-            // Create Prometheus backend listener for real-time monitoring
-            DslPrometheusListener prometheusListener = DslPrometheusListener.prometheusListener();
-            logger.info("Prometheus metrics will be exposed on port 9270");
-    
-            // Run the test with JTL writer
-            TestPlanStats stats = testPlan(
-                    threadGroup,
-                    jtlWriter,
-                    prometheusListener
-                ).run();
-            
-            // Log that this is where we would generate HTML report
-            logger.info("JTL file created at: {}. Use JMeter to convert to HTML report", resultsFile);
-            
-            return stats;
-        }, ErrorCode.TEST_EXECUTION_ERROR, "Error executing SOAP test", logger);
+    public TestEngine setXmlRequestModifier(Consumer<XmlRequestEntity> modifier) {
+        this.xmlModifier = modifier;
+        return this;
     }
     
     /**
-     * Execute a JDBC test with the given request entity
+     * Set a modifier function for SOAP requests.
      * 
-     * @param requestEntity The JDBC request entity
-     * @param threads Number of threads (users)
-     * @param iterations Number of iterations per thread
-     * @return Test statistics
-     * @throws PerfTestException If an error occurs during test execution
+     * <p>This modifier will be applied to each SoapRequestEntity before it's processed
+     * by the SoapComponent. It can be used to add common headers, SOAP actions,
+     * or other request modifications.</p>
+     * 
+     * @param modifier A Consumer function that modifies SoapRequestEntity instances
+     * @return This TestEngine instance for method chaining
      */
-    public TestPlanStats executeJdbcTest(JdbcRequestEntity requestEntity, int threads, int iterations) throws IOException {
-        ErrorHandler.validateNotNull(requestEntity, ErrorCode.TEST_EXECUTION_ERROR, "JDBC request entity cannot be null");
-        ErrorHandler.validate(threads > 0, ErrorCode.TEST_EXECUTION_ERROR, "Threads must be greater than 0");
-        ErrorHandler.validate(iterations > 0, ErrorCode.TEST_EXECUTION_ERROR, "Iterations must be greater than 0");
-        
-        logger.info("Executing JDBC test: {} with {} threads, {} iterations", 
-                requestEntity.getProperty("name", "JDBC Request"), threads, iterations);
-        
-        // Clear previous requests
-        requests.clear();
-        
-        // Set protocol name
-        protocolName = "jdbc";
-        
-        // Set thread and iteration count
-        this.threads = threads;
-        this.iterations = iterations;
-        
-        // Add the request
-        addRequest(requestEntity);
-        
-        return ErrorHandler.executeWithIOHandling(() -> {
-            // Build samplers
-            BaseThreadGroup.ThreadGroupChild[] samplers = buildSamplers();
-            
-            // Create thread group
-            DslDefaultThreadGroup threadGroup = threadGroup()
-                .rampTo(threads, rampUp);
-                
-            // Add samplers to thread group
-            if (samplers.length > 0) {
-                threadGroup = threadGroup.children(samplers);
-            }
-            
-            // Create results directory and file
-            Path resultsFile = createResultsDirectory(protocolName);
-            logger.info("JTL results will be saved to: {}", resultsFile);
-            
-            // Create JTL writer for saving results
-            JtlWriter jtlWriter = jtlWriter(resultsFile.toString());
-            // Create Prometheus backend listener for real-time monitoring
-            DslPrometheusListener prometheusListener = DslPrometheusListener.prometheusListener();
-            logger.info("Prometheus metrics will be exposed on port 9270");
-    
-            // Run the test with JTL writer
-            TestPlanStats stats = testPlan(
-                    threadGroup,
-                    jtlWriter,
-                    prometheusListener
-                ).run();
-            
-            // Log that this is where we would generate HTML report
-            logger.info("JTL file created at: {}. Use JMeter to convert to HTML report", resultsFile);
-            
-            return stats;
-        }, ErrorCode.TEST_EXECUTION_ERROR, "Error executing JDBC test", logger);
+    public TestEngine setSoapRequestModifier(Consumer<SoapRequestEntity> modifier) {
+        this.soapModifier = modifier;
+        return this;
     }
     
     /**
-     * Run the test plan
+     * Set a modifier function for JDBC requests.
      * 
-     * @return Test statistics
-     * @throws PerfTestException If an error occurs during test execution
+     * <p>This modifier will be applied to each JdbcRequestEntity before it's processed
+     * by the JdbcComponent. It can be used to add common query parameters,
+     * connection pool settings, or other request modifications.</p>
+     * 
+     * @param modifier A Consumer function that modifies JdbcRequestEntity instances
+     * @return This TestEngine instance for method chaining
+     */
+    public TestEngine setJdbcRequestModifier(Consumer<JdbcRequestEntity> modifier) {
+        this.jdbcModifier = modifier;
+        return this;
+    }
+    
+    /**
+     * Run the test without additional configuration.
+     * 
+     * <p>This method is an alias for runTest() to maintain compatibility with 
+     * older code. It simply delegates to the runTest() method.</p>
+     * 
+     * @return TestPlanStats containing the results of the test execution
+     * @throws IOException If there's an error creating result directories
+     * @throws TestExecutionException If an error occurs during test execution
      */
     public TestPlanStats run() throws IOException {
-        logger.info("Running test plan: {} with {} threads, {} iterations, {} ramp-up",
-                testPlanName, threads, iterations, rampUp);
-        
-        ErrorHandler.validate(!requests.isEmpty(), ErrorCode.TEST_EXECUTION_ERROR, 
-                "No requests added to test plan. Add at least one request before running the test.");
-        
-        return ErrorHandler.executeWithIOHandling(() -> {
-            // Build samplers first
-            BaseThreadGroup.ThreadGroupChild[] samplers = buildSamplers();
-            ErrorHandler.validate(samplers.length > 0, ErrorCode.TEST_EXECUTION_ERROR, 
-                    "No samplers were built. Check that components are properly registered.");
-            
-            // Create thread group first
-            DslDefaultThreadGroup threadGroupConfig = threadGroup()
-                .rampTo(threads, rampUp);
-            
-            // Add samplers to thread group
-            threadGroupConfig = threadGroupConfig.children(samplers);
-            
-            // Create results directory and file
-            Path resultsFile = createResultsDirectory(protocolName);
-            logger.info("JTL results will be saved to: {}", resultsFile);
-            
-            // Create JTL writer for saving results
-            JtlWriter jtlWriter = jtlWriter(resultsFile.toString());
-            // Create Prometheus backend listener for real-time monitoring
-            DslPrometheusListener prometheusListener = DslPrometheusListener.prometheusListener();
-            logger.info("Prometheus metrics will be exposed on port 9270");
-    
-            // Run the test plan with JTL writer
-            TestPlanStats stats = testPlan(
-                    threadGroupConfig,
-                    jtlWriter,
-                    prometheusListener
-                ).run();
-            
-            logger.info("Test plan execution completed successfully");
-            logger.info("JTL file created at: {}. HTML report can be generated from this file", resultsFile);
-            
-            saveTestSummary(stats, resultsFile);
-            
-            return stats;
-        }, ErrorCode.TEST_EXECUTION_ERROR, "Failed to run test plan", logger);
+        return runTest();
     }
     
     /**
-     * Save a summary of the test results to a file
+     * Execute the test plan with all configured requests and settings.
      * 
-     * @param stats The test statistics
-     * @param resultsFile The path to the results file
-     */
-    private void saveTestSummary(TestPlanStats stats, Path resultsFile) {
-        try {
-            // Create a summary file next to the JTL file
-            Path summaryFile = resultsFile.resolveSibling(resultsFile.getFileName().toString() + ".summary.txt");
-            
-            // Write summary information to the file
-            try (FileWriter writer = new FileWriter(summaryFile.toFile())) {
-                writer.write("Test Plan: " + testPlanName + "\n");
-                writer.write("Protocol: " + protocolName + "\n");
-                writer.write("Threads: " + threads + "\n");
-                writer.write("Iterations: " + iterations + "\n");
-                writer.write("Ramp-up: " + rampUp + "\n");
-                writer.write("\n");
-                writer.write("Overall Statistics:\n");
-                writer.write("- Samples Count: " + stats.overall().samplesCount() + "\n");
-                writer.write("- Error Count: " + stats.overall().errorsCount() + "\n");
-                
-                // Error rate calculation manually since errorsRate() is not available
-                double errorRate = stats.overall().samplesCount() > 0 
-                    ? (double) stats.overall().errorsCount() / stats.overall().samplesCount() 
-                    : 0.0;
-                writer.write("- Error Rate: " + String.format("%.2f%%", errorRate * 100) + "\n");
-                
-                // Use mean() instead of avg()
-                writer.write("- Average Response Time: " + stats.overall().sampleTime().mean() + " ms\n");
-                
-                // Use percentile(50) instead of perc50()
-                writer.write("- Median Response Time: " + stats.overall().sampleTime().median() + " ms\n");
-                writer.write("- 90th Percentile Response Time: " + stats.overall().sampleTime().perc90() + " ms\n");
-                writer.write("- 95th Percentile Response Time: " + stats.overall().sampleTime().perc95() + " ms\n");
-                writer.write("- 99th Percentile Response Time: " + stats.overall().sampleTime().perc99() + " ms\n");
-                writer.write("- Min Response Time: " + stats.overall().sampleTime().min() + " ms\n");
-                writer.write("- Max Response Time: " + stats.overall().sampleTime().max() + " ms\n");
-                
-                // Calculate throughput manually
-                double elapsedTimeSeconds = stats.duration().toMillis() / 1000.0;
-                double throughput = elapsedTimeSeconds > 0 
-                    ? stats.overall().samplesCount() / elapsedTimeSeconds
-                    : 0.0;
-                writer.write("- Throughput: " + String.format("%.2f", throughput) + " req/s\n");
-            }
-            
-            logger.info("Test summary saved to: {}", summaryFile);
-        } catch (IOException e) {
-            logger.error("Failed to save test summary: {}", e.getMessage(), e);
-            // Don't throw an exception here, as it would disrupt the normal flow
-        }
-    }
-    
-    /**
-     * Build JMeter samplers for all requests
+     * <p>This method processes all requests added to the TestEngine, generating
+     * JMeter samplers, configuring the test execution, and running the test.</p>
      * 
-     * @return Array of samplers
-     * @throws PerfTestException If an error occurs building samplers
-     */
-    private BaseThreadGroup.ThreadGroupChild[] buildSamplers() throws IOException {
-        return ErrorHandler.executeWithIOHandling(() -> {
-            List<BaseThreadGroup.ThreadGroupChild> samplers = new ArrayList<>();
-            
-            for (RequestEntity request : requests) {
-                if (request instanceof HttpRequestEntity) {
-                    HttpRequestEntity httpRequest = (HttpRequestEntity) request;
-                    if (httpModifier != null) {
-                        httpModifier.accept(httpRequest);
-                    }
-                    samplers.add(testSystem.processRequest(httpRequest));
-                } else if (request instanceof GraphQLRequestEntity) {
-                    GraphQLRequestEntity graphQLRequest = (GraphQLRequestEntity) request;
-                    if (graphqlModifier != null) {
-                        graphqlModifier.accept(graphQLRequest);
-                    }
-                    samplers.add(testSystem.processRequest(graphQLRequest));
-                } else if (request instanceof SoapRequestEntity) {
-                    SoapRequestEntity soapRequest = (SoapRequestEntity) request;
-                    if (soapModifier != null) {
-                        soapModifier.accept(soapRequest);
-                    }
-                    samplers.add(testSystem.processRequest(soapRequest));
-                } else if (request instanceof XmlRequestEntity) {
-                    XmlRequestEntity xmlRequest = (XmlRequestEntity) request;
-                    if (xmlModifier != null) {
-                        xmlModifier.accept(xmlRequest);
-                    }
-                    samplers.add(testSystem.processRequest(xmlRequest));
-                } else if (request instanceof JdbcRequestEntity) {
-                    JdbcRequestEntity jdbcRequest = (JdbcRequestEntity) request;
-                    if (jdbcModifier != null) {
-                        jdbcModifier.accept(jdbcRequest);
-                    }
-                    samplers.add(testSystem.processRequest(jdbcRequest));
-                }
-            }
-            
-            return samplers.toArray(new BaseThreadGroup.ThreadGroupChild[0]);
-        }, ErrorCode.TEST_EXECUTION_ERROR, "Failed to build samplers", logger);
-    }
-    
-    /**
-     * Add a post-processor to run after each sampler
-     * This will be implemented in a future version
+     * <p>It handles setting up the result directories, configuring logging,
+     * creating the JMeter test plan, and returning the test statistics.</p>
      * 
-     * @param postProcessor The post-processor to add
+     * @return TestPlanStats containing the results of the test execution
+     * @throws IOException If there's an error creating result directories
+     * @throws TestExecutionException If an error occurs during test setup or execution
      */
-    public void addPostProcessor(BaseThreadGroup.ThreadGroupChild postProcessor) {
-        ErrorHandler.validateNotNull(postProcessor, ErrorCode.TEST_SETUP_ERROR, "Post-processor cannot be null");
-        // To be implemented
-        logger.warn("addPostProcessor is not yet implemented");
-    }
-    
-    /**
-     * Add a listener to collect test results
-     * This will be implemented in a future version
-     * 
-     * @param listener The listener to add
-     */
-    public void addListener(BaseThreadGroup.ThreadGroupChild listener) {
-        ErrorHandler.validateNotNull(listener, ErrorCode.TEST_SETUP_ERROR, "Listener cannot be null");
-        // To be implemented
-        logger.warn("addListener is not yet implemented");
-    }
-    
-    /**
-     * Get a Result containing a safely created TestPlanStats
-     * 
-     * @return A Result containing the TestPlanStats or an error
-     */
-    public Result<TestPlanStats> safeRun() throws IOException {
-        logger.info("Safely running test plan: {} with {} threads, {} iterations, {} ramp-up",
-                testPlanName, threads, iterations, rampUp);
-        
+    public TestPlanStats runTest() throws IOException {
         if (requests.isEmpty()) {
-            return Result.failure(ErrorCode.TEST_EXECUTION_ERROR, 
-                    "No requests added to test plan. Add at least one request before running the test.");
+            throw new TestExecutionException(ErrorCode.TEST_EXECUTION_ERROR, "No requests added to test plan");
         }
         
+        logger.info("Starting test execution with {} threads, {} iterations, {} ramp-up",
+                threads, iterations, rampUp);
+        
+        // Configure JMeter logging for this specific test execution
+        String testLogFile = JMeterLogConfiguration.configureLogging(protocolName);
+        logger.info("JMeter logs will be written to: {}", testLogFile);
+        
+        // Create results directory
+        Path jtlPath = createResultsDirectory(protocolName);
+        logger.info("Test results will be written to: {}", jtlPath);
+        
+        // Create thread group for the test with ThreadGroupChild[] samplers
+        ThreadGroupChild[] samplers = generateSamplers();
+        BaseThreadGroup threadGroup = threadGroup(threads, iterations, samplers);
+        
+        // Create the test plan with listeners
+        DslTestPlan testPlan = testPlan(
+                threadGroup, 
+                jtlWriter(jtlPath.toString())
+        );
+        
         try {
-            // Build samplers first
-            BaseThreadGroup.ThreadGroupChild[] samplers = buildSamplers();
-            if (samplers.length == 0) {
-                return Result.failure(ErrorCode.TEST_EXECUTION_ERROR, 
-                        "No samplers were built. Check that components are properly registered.");
+            // Run the test and return the statistics
+            TestPlanStats stats = testPlan.run();
+            logger.info("Test execution completed successfully");
+            return stats;
+        } catch (Exception e) {
+            logger.error("Test execution failed", e);
+            throw new TestExecutionException(ErrorCode.TEST_EXECUTION_ERROR, "Test execution failed", e);
+        }
+    }
+    
+    /**
+     * Generates JMeter samplers for all requests in the test plan.
+     * 
+     * <p>This method processes each request entity using the appropriate component
+     * registered with the TestSystem, applying any modifiers before processing.</p>
+     * 
+     * @return Array of JMeter samplers for the test plan
+     */
+    private ThreadGroupChild[] generateSamplers() {
+        List<ThreadGroupChild> samplers = new ArrayList<>();
+        
+        for (RequestEntity request : requests) {
+            // Apply the appropriate modifier based on request type
+            if (request instanceof HttpRequestEntity && httpModifier != null) {
+                httpModifier.accept((HttpRequestEntity) request);
+            } else if (request instanceof GraphQLRequestEntity && graphqlModifier != null) {
+                graphqlModifier.accept((GraphQLRequestEntity) request);
+            } else if (request instanceof XmlRequestEntity && xmlModifier != null) {
+                xmlModifier.accept((XmlRequestEntity) request);
+            } else if (request instanceof SoapRequestEntity && soapModifier != null) {
+                soapModifier.accept((SoapRequestEntity) request);
+            } else if (request instanceof JdbcRequestEntity && jdbcModifier != null) {
+                jdbcModifier.accept((JdbcRequestEntity) request);
             }
             
-            // Create thread group
-            DslDefaultThreadGroup threadGroupConfig = threadGroup()
-                .rampTo(threads, rampUp);
-            
-            // Add samplers to thread group
-            threadGroupConfig = threadGroupConfig.children(samplers);
-            
-            // Create results directory and file
-            Path resultsFile = createResultsDirectory(protocolName);
-            logger.info("JTL results will be saved to: {}", resultsFile);
-            
-            // Create JTL writer for saving results
-            JtlWriter jtlWriter = jtlWriter(resultsFile.toString());
-            // Create Prometheus backend listener for real-time monitoring
-            DslPrometheusListener prometheusListener = DslPrometheusListener.prometheusListener();
-            logger.info("Prometheus metrics will be exposed on port 9270");
-    
-            // Run the test plan with JTL writer
-            TestPlanStats stats = testPlan(
-                    threadGroupConfig,
-                    jtlWriter,
-                    prometheusListener
-                ).run();
-            
-            logger.info("Test plan execution completed successfully");
-            logger.info("JTL file created at: {}. HTML report can be generated from this file", resultsFile);
-            
-            saveTestSummary(stats, resultsFile);
-            
-            return Result.success(stats);
-        } catch (Exception e) {
-            logger.error("Failed to run test plan: {}", e.getMessage(), e);
-            if (e instanceof PerfTestException) {
-                return Result.failure((PerfTestException) e);
+            // Process the request with the appropriate component
+            ThreadGroupChild sampler = testSystem.processRequest(request);
+            if (sampler != null) {
+                samplers.add(sampler);
             } else {
-                return Result.failure(ErrorCode.TEST_EXECUTION_ERROR, "Failed to run test plan: " + e.getMessage(), e);
+                logger.warn("No component found to process request of type {}", request.getClass().getSimpleName());
             }
         }
+        
+        return samplers.toArray(new ThreadGroupChild[0]);
+    }
+    
+    /**
+     * Create a uniquely named directory for storing test results (JTL files).
+     * Uses JMeterLogConfiguration to ensure consistent naming between logs and results.
+     * 
+     * @param protocol The protocol name to include in the directory name
+     * @return Path to the JTL file that will be used for results
+     * @throws IOException If there's an error creating the directory
+     */
+    private Path createResultsDirectory(String protocol) throws IOException {
+        // Use the same timestamp and unique ID as the log configuration
+        String directoryName = protocol + "_" + JMeterLogConfiguration.getRunDirectoryName();
+        
+        // Create the directory
+        Path resultsDir = Paths.get("target", "jtl-results", directoryName);
+        Files.createDirectories(resultsDir);
+        
+        // Store the path in the result paths map
+        resultPaths.put(protocol, resultsDir);
+        
+        // Return the path to the JTL file
+        return resultsDir.resolve("results.jtl");
+    }
+    
+    /**
+     * Gets the path where test results are stored for a specific protocol.
+     * 
+     * <p>If no tests have been run for the specified protocol, this method returns null.</p>
+     * 
+     * @param protocol The protocol name
+     * @return The path to the results directory, or null if none exists
+     */
+    public Path getResultsPath(String protocol) {
+        return resultPaths.get(protocol);
+    }
+    
+    /**
+     * Execute a test with a single HTTP request.
+     * 
+     * <p>This is a convenience method for executing a test with a single HTTP request.
+     * It sets up the engine, adds the request, and runs the test.</p>
+     * 
+     * @param request The HTTP request to execute
+     * @param threads Number of threads (virtual users)
+     * @param iterations Number of iterations per thread
+     * @return TestPlanStats containing the results of the test execution
+     * @throws IOException If there's an error creating result directories
+     */
+    public TestPlanStats executeHttpTest(HttpRequestEntity request, int threads, int iterations) throws IOException {
+        setProtocolName("http");
+        setThreads(threads);
+        setIterations(iterations);
+        addRequest(request);
+        return runTest();
+    }
+    
+    /**
+     * Execute a test with a single GraphQL request.
+     * 
+     * <p>This is a convenience method for executing a test with a single GraphQL request.
+     * It sets up the engine, adds the request, and runs the test.</p>
+     * 
+     * @param request The GraphQL request to execute
+     * @param threads Number of threads (virtual users)
+     * @param iterations Number of iterations per thread
+     * @return TestPlanStats containing the results of the test execution
+     * @throws IOException If there's an error creating result directories
+     */
+    public TestPlanStats executeGraphQLTest(GraphQLRequestEntity request, int threads, int iterations) throws IOException {
+        setProtocolName("graphql");
+        setThreads(threads);
+        setIterations(iterations);
+        addRequest(request);
+        return runTest();
+    }
+    
+    /**
+     * Execute a test with a single SOAP request.
+     * 
+     * <p>This is a convenience method for executing a test with a single SOAP request.
+     * It sets up the engine, adds the request, and runs the test.</p>
+     * 
+     * @param request The SOAP request to execute
+     * @param threads Number of threads (virtual users)
+     * @param iterations Number of iterations per thread
+     * @return TestPlanStats containing the results of the test execution
+     * @throws IOException If there's an error creating result directories
+     */
+    public TestPlanStats executeSoapTest(SoapRequestEntity request, int threads, int iterations) throws IOException {
+        setProtocolName("soap");
+        setThreads(threads);
+        setIterations(iterations);
+        addRequest(request);
+        return runTest();
+    }
+    
+    /**
+     * Execute a test with a single XML request.
+     * 
+     * <p>This is a convenience method for executing a test with a single XML request.
+     * It sets up the engine, adds the request, and runs the test.</p>
+     * 
+     * @param request The XML request to execute
+     * @param threads Number of threads (virtual users)
+     * @param iterations Number of iterations per thread
+     * @return TestPlanStats containing the results of the test execution
+     * @throws IOException If there's an error creating result directories
+     */
+    public TestPlanStats executeXmlTest(XmlRequestEntity request, int threads, int iterations) throws IOException {
+        setProtocolName("xml");
+        setThreads(threads);
+        setIterations(iterations);
+        addRequest(request);
+        return runTest();
+    }
+    
+    /**
+     * Execute a test with a single JDBC request.
+     * 
+     * <p>This is a convenience method for executing a test with a single JDBC request.
+     * It sets up the engine, adds the request, and runs the test.</p>
+     * 
+     * @param request The JDBC request to execute
+     * @param threads Number of threads (virtual users)
+     * @param iterations Number of iterations per thread
+     * @return TestPlanStats containing the results of the test execution
+     * @throws IOException If there's an error creating result directories
+     */
+    public TestPlanStats executeJdbcTest(JdbcRequestEntity request, int threads, int iterations) throws IOException {
+        setProtocolName("jdbc");
+        setThreads(threads);
+        setIterations(iterations);
+        addRequest(request);
+        return runTest();
     }
 }

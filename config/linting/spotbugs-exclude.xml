@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Ignore serialVersionUID issues -->
+    <Match>
+        <Bug pattern="SE_NO_SERIALVERSIONID"/>
+    </Match>
+    
+    <!-- Ignore non-transient non-serializable instance field in serializable class -->
+    <Match>
+        <Bug pattern="SE_BAD_FIELD"/>
+    </Match>
+    
+    <!-- Ignore issues in test code -->
+    <Match>
+        <Class name="~.*\.*Test"/>
+    </Match>
+    
+    <!-- Ignore field names that don't follow naming convention -->
+    <Match>
+        <Bug pattern="NM_FIELD_NAMING_CONVENTION"/>
+    </Match>
+    
+    <!-- Ignore JMeter DSL specific issues -->
+    <Match>
+        <Package name="~us\.abstracta\.jmeter\..*"/>
+    </Match>
+</FindBugsFilter>

@@ -1,0 +1,30 @@
+name: GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Generate GitHub Pages from README
+      run: |
+        mkdir -p docs
+        cp README.md docs/index.md
+        cat > docs/_config.yml << 'CONFIG'
+        theme: jekyll-theme-cayman
+        title: Performance Automation Framework
+        description: A Java-based Performance Testing Framework with JMeter DSL
+        CONFIG
+        
+    - name: Deploy to GitHub Pages
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        folder: docs
+        branch: gh-pages
+        clean-exclude: |
+          reports/**

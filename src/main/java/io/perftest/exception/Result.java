@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+import java.io.Serializable;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -13,7 +14,9 @@ import java.util.function.Supplier;
  * @param <T> The type of the successful result
  */
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-public class Result<T> {
+public class Result<T> implements Serializable {
+    
+    private static final long serialVersionUID = 1L;
     
     /**
      * The value of the successful result, null if failure

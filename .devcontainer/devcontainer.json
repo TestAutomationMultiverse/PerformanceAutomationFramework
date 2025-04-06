@@ -1,6 +1,6 @@
 {
     "name": "Performance Testing Framework",
-    "description": "Development environment for the Performance Testing Framework with Java 17, Node.js 20, Maven, JMeter, and SonarQube support with Docker Compose for Prometheus and Grafana",
+    "description": "Development environment for the Performance Testing Framework with Java 17, Node.js 20, Maven, JMeter, and advanced linting/code quality tools",
     "dockerFile": "Dockerfile",
     "postCreateCommand": "bash .devcontainer/post-create.sh",
     "features": {
@@ -29,25 +29,66 @@
                 "redhat.vscode-xml",
                 "vscjava.vscode-maven",
                 "ms-azuretools.vscode-docker",
-                "sonarsource.sonarlint-vscode",
+                // "sonarsource.sonarlint-vscode",
                 "github.vscode-github-actions",
                 "eamodio.gitlens",
-                "HongYan.maven-cleaner"
+                "HongYan.maven-cleaner",
+                // "vscjava.vscode-java-debug",
+                // "vscjava.vscode-java-dependency",
+                // "vscjava.vscode-java-test",
+                // "redhat.java",
+                "shengchen.vscode-checkstyle",
+                "vscjava.vscode-gradle",
+                "DavidAnson.vscode-markdownlint",
+                "christian-kohler.path-intellisense",
+                "richardwillis.vscode-spotbugs",
+                "github.vscode-pull-request-github",
+                "ms-vscode.vscode-typescript-tslint-plugin"
             ],
             "settings": {
                 "java.configuration.updateBuildConfiguration": "automatic",
                 "java.compile.nullAnalysis.mode": "automatic",
                 "editor.formatOnSave": true,
                 "files.autoSave": "afterDelay",
-                "terminal.integrated.defaultProfile.linux": "bash"
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "java.format.settings.url": "https://raw.githubusercontent.com/google/styleguide/gh-pages/eclipse-java-google-style.xml",
+                "java.checkstyle.configuration": "${workspaceFolder}/config/checkstyle/checkstyle.xml",
+                "java.checkstyle.version": "10.12.3",
+                "editor.codeActionsOnSave": {
+                    "source.organizeImports": "always",
+                    "source.fixAll": "always"
+                },
+                "java.spotbugs.extraArgs": [
+                    "-effort:max",
+                    "-high"
+                ],
+                "spotbugs.runAtFullBuild": true,
+                // "sonarlint.rules": {
+                //     "java:S106": {
+                //         "level": "on"
+                //     },
+                //     "java:S1192": {
+                //         "level": "on"
+                //     },
+                //     "java:S1214": {
+                //         "level": "on"
+                //     }
+                // }
             }
         }
     },
     "remoteUser": "vscode",
-    "forwardPorts": [8080, 9090, 3000, 9270],
+    "forwardPorts": [
+        8080,
+        9090,
+        3000,
+        9270
+    ],
     "hostRequirements": {
         "memory": "8gb",
         "cpus": 4
     },
-    "runArgs": ["--init"]
+    "runArgs": [
+        "--init"
+    ]
 }

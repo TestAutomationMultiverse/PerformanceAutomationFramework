@@ -1,7 +1,7 @@
 package io.perftest.http_tests;
 
 import io.perftest.components.http.HttpComponent;
-import io.perftest.core.BaseTest;
+import io.perftest.core.test.BaseTest;
 import io.perftest.engine.TestEngine;
 import io.perftest.entities.request.HttpRequestEntity;
 import io.perftest.systems.TestSystem;
