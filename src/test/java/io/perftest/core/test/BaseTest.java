@@ -1,16 +1,7 @@
 package io.perftest.core.test;
 
-import io.perftest.engine.TestEngine;
-import io.perftest.systems.TestSystem;
-import io.perftest.util.JtlToHtmlReportConverter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import us.abstracta.jmeter.javadsl.core.TestPlanStats;
-
 import java.awt.Desktop;
-import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -21,19 +12,25 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import io.perftest.engine.TestEngine;
+import io.perftest.systems.TestSystem;
+import io.perftest.util.JtlToHtmlReportConverter;
+import us.abstracta.jmeter.javadsl.core.TestPlanStats;
 
 /**
  * Base test class with common utility methods for all test types.
  */
 public abstract class BaseTest {
     private static final Logger logger = LoggerFactory.getLogger(BaseTest.class);
-    
+
     // Keep track of the last protocol used
     private String lastProtocolUsed = "default";
-    
+
     // Keep track of the last report directory
     private Path lastReportDirectory;
-    
+
     // Keep track of the last report file
     private Path lastReportFile;
 
@@ -45,33 +42,33 @@ public abstract class BaseTest {
      * @return Configured TestEngine instance
      */
     protected TestEngine configureTestEngine(TestSystem testSystem, Map<String, Object> config) {
-        Map<String, Object> executionConfig = (Map<String, Object>) config.getOrDefault("execution", Map.of());
-        
+        Map<String, Object> executionConfig =
+                (Map<String, Object>) config.getOrDefault("execution", Map.of());
+
         int threads = (Integer) executionConfig.getOrDefault("threads", 1);
         int iterations = (Integer) executionConfig.getOrDefault("iterations", 1);
         int rampUpSeconds = (Integer) executionConfig.getOrDefault("rampUpSeconds", 0);
         int holdSeconds = (Integer) executionConfig.getOrDefault("holdSeconds", 0);
-        
+
         // Determine protocol from the config file name or content if possible
         String protocol = determineProtocol(config);
-        
+
         TestEngine engine = new TestEngine(testSystem);
         engine.setThreads(threads);
         engine.setIterations(iterations);
         engine.setRampUp(java.time.Duration.ofSeconds(rampUpSeconds));
-        
+
         // Set protocol name for reporting
         if (protocol != null && !protocol.isEmpty()) {
             engine.setProtocolName(protocol);
             lastProtocolUsed = protocol;
         }
-        
+
         return engine;
     }
-    
+
     /**
-     * Set the protocol name for reporting
-     * This helps with keeping track of which protocol was used
+     * Set the protocol name for reporting This helps with keeping track of which protocol was used
      *
      * @param protocolName The protocol name
      */
@@ -80,7 +77,7 @@ public abstract class BaseTest {
             this.lastProtocolUsed = protocolName;
         }
     }
-    
+
     /**
      * Get the last used protocol name
      * 
@@ -89,7 +86,7 @@ public abstract class BaseTest {
     public String getLastProtocolUsed() {
         return lastProtocolUsed;
     }
-    
+
     /**
      * Get the last report directory
      * 
@@ -98,7 +95,7 @@ public abstract class BaseTest {
     public Path getLastReportDirectory() {
         return lastReportDirectory;
     }
-    
+
     /**
      * Get the last report file
      * 
@@ -107,7 +104,7 @@ public abstract class BaseTest {
     public Path getLastReportFile() {
         return lastReportFile;
     }
-    
+
     /**
      * Determine the protocol from the configuration
      *
@@ -119,11 +116,11 @@ public abstract class BaseTest {
         if (config.containsKey("protocol")) {
             return (String) config.get("protocol");
         }
-        
+
         // Try to infer protocol from the configuration structure
         if (config.containsKey("request")) {
             Map<String, Object> request = (Map<String, Object>) config.get("request");
-            
+
             if (request.containsKey("graphql") || request.containsKey("graphqlQuery")) {
                 return "graphql";
             } else if (request.containsKey("soap") || request.containsKey("soapAction")) {
@@ -134,11 +131,11 @@ public abstract class BaseTest {
                 return "http";
             }
         }
-        
+
         // Default to a generic protocol name
         return "api";
     }
-    
+
     /**
      * Log test results and statistics
      *
@@ -150,19 +147,22 @@ public abstract class BaseTest {
         logger.info("Average response time: {} ms", stats.overall().sampleTime().mean());
         logger.info("Median response time: {} ms", stats.overall().sampleTime().median());
         logger.info("90th percentile response time: {} ms", stats.overall().sampleTime().perc90());
-        logger.info("Error rate: {}%", stats.overall().errorsCount() * 100.0 / stats.overall().samplesCount());
+        logger.info("Error rate: {}%",
+                stats.overall().errorsCount() * 100.0 / stats.overall().samplesCount());
         // Calculate throughput manually
-        double durationSeconds = stats.duration().getSeconds() + stats.duration().getNano() / 1_000_000_000.0;
-        double throughput = durationSeconds > 0 ? stats.overall().samplesCount() / durationSeconds : 0;
+        double durationSeconds =
+                stats.duration().getSeconds() + stats.duration().getNano() / 1_000_000_000.0;
+        double throughput =
+                durationSeconds > 0 ? stats.overall().samplesCount() / durationSeconds : 0;
         logger.info("Throughput: {} requests/sec", String.format("%.2f", throughput));
-        
+
         // Generate HTML report from JTL file
         generateHtmlReport();
-        
+
         // Print a summary report that includes the report URL
         logger.info("\n{}", createReportSummary(stats));
     }
-    
+
     /**
      * Generate HTML report from JTL file
      * 
@@ -171,23 +171,24 @@ public abstract class BaseTest {
     protected Path generateHtmlReport() {
         try {
             // Define paths for JTL file and HTML report directory
-            Path jtlFile = Paths.get("target", "jtl-results", lastProtocolUsed + "-test-results.jtl");
-            Path htmlReportDir = Paths.get("target", "html-reports", lastProtocolUsed).toAbsolutePath();
-            
+            Path jtlFile =
+                    Paths.get("target", "jtl-results", lastProtocolUsed + "-test-results.jtl");
+            Path htmlReportDir =
+                    Paths.get("target", "html-reports", lastProtocolUsed).toAbsolutePath();
+
             // Store the report directory for later reference
             lastReportDirectory = htmlReportDir;
-            
-            logger.info("Generating HTML report for protocol '{}' from JTL file: {}", lastProtocolUsed, jtlFile);
-            
+
+            logger.info("Generating HTML report for protocol '{}' from JTL file: {}",
+                    lastProtocolUsed, jtlFile);
+
             // Generate HTML report
-            boolean success = JtlToHtmlReportConverter.generateHtmlReport(
-                    jtlFile.toString(), 
-                    htmlReportDir.toString()
-            );
-            
+            boolean success = JtlToHtmlReportConverter.generateHtmlReport(jtlFile.toString(),
+                    htmlReportDir.toString());
+
             if (success) {
                 logger.info("HTML report generated successfully at: {}", htmlReportDir);
-                
+
                 // Find the latest report file by timestamp pattern
                 Path reportFile = findLatestReportFile(htmlReportDir);
                 if (reportFile != null) {
@@ -210,10 +211,10 @@ public abstract class BaseTest {
         }
         return null;
     }
-    
+
     /**
-     * Find the latest report file in the given directory
-     * Looks for files matching the pattern index_timestamp.html
+     * Find the latest report file in the given directory Looks for files matching the pattern
+     * index_timestamp.html
      * 
      * @param reportDir Directory containing HTML reports
      * @return Path to the latest report file, or null if none found
@@ -223,32 +224,32 @@ public abstract class BaseTest {
             if (!Files.exists(reportDir) || !Files.isDirectory(reportDir)) {
                 return null;
             }
-            
+
             List<Path> timestampedFiles = new ArrayList<>();
-            
+
             // Find all files matching the pattern index_timestamp.html
             Files.list(reportDir)
-                .filter(p -> p.getFileName().toString().matches("index_\\d+\\.html"))
-                .forEach(timestampedFiles::add);
-            
+                    .filter(p -> p.getFileName().toString().matches("index_\\d+\\.html"))
+                    .forEach(timestampedFiles::add);
+
             if (timestampedFiles.isEmpty()) {
                 return null;
             }
-            
+
             // Sort by filename (which contains timestamp) in descending order to get latest
             Collections.sort(timestampedFiles, (p1, p2) -> {
                 String name1 = p1.getFileName().toString();
                 String name2 = p2.getFileName().toString();
                 return name2.compareTo(name1);
             });
-            
+
             return timestampedFiles.get(0);
         } catch (IOException e) {
             logger.error("Error finding latest report file", e);
             return null;
         }
     }
-    
+
     /**
      * Get all report directories
      * 
@@ -260,16 +261,15 @@ public abstract class BaseTest {
             if (!Files.exists(baseReportDir) || !Files.isDirectory(baseReportDir)) {
                 return Collections.emptyList();
             }
-            
-            return Files.list(baseReportDir)
-                    .filter(Files::isDirectory)
+
+            return Files.list(baseReportDir).filter(Files::isDirectory)
                     .collect(Collectors.toList());
         } catch (IOException e) {
             logger.error("Error getting report directories", e);
             return Collections.emptyList();
         }
     }
-    
+
     /**
      * Get all report files for a specific protocol
      * 
@@ -282,7 +282,7 @@ public abstract class BaseTest {
             if (!Files.exists(protocolReportDir) || !Files.isDirectory(protocolReportDir)) {
                 return Collections.emptyList();
             }
-            
+
             return Files.list(protocolReportDir)
                     .filter(p -> p.getFileName().toString().matches("index.*\\.html"))
                     .collect(Collectors.toList());
@@ -291,10 +291,10 @@ public abstract class BaseTest {
             return Collections.emptyList();
         }
     }
-    
+
     /**
-     * Open the latest report in a browser
-     * This method attempts to open the default browser to view the report
+     * Open the latest report in a browser This method attempts to open the default browser to view
+     * the report
      * 
      * @return true if the browser was opened successfully
      */
@@ -310,12 +310,13 @@ public abstract class BaseTest {
                         return true;
                     }
                 }
-                
+
                 // Fallback to system-specific commands
                 String osName = System.getProperty("os.name").toLowerCase();
-                
+
                 if (osName.contains("windows")) {
-                    new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", lastReportFile.toString()).start();
+                    new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler",
+                            lastReportFile.toString()).start();
                 } else if (osName.contains("mac")) {
                     new ProcessBuilder("open", lastReportFile.toString()).start();
                 } else if (osName.contains("nix") || osName.contains("nux")) {
@@ -340,7 +341,7 @@ public abstract class BaseTest {
                         }
                     }
                 }
-                
+
                 logger.info("Attempted to open report in browser: {}", lastReportFile);
                 return true;
             } catch (Exception e) {
@@ -352,10 +353,10 @@ public abstract class BaseTest {
             return false;
         }
     }
-    
+
     /**
-     * Get URL for the latest report
-     * This can be used to display the URL in the console for manual access
+     * Get URL for the latest report This can be used to display the URL in the console for manual
+     * access
      * 
      * @return String URL for the latest report, or null if none available
      */
@@ -365,10 +366,10 @@ public abstract class BaseTest {
         }
         return null;
     }
-    
+
     /**
-     * Create a report summary that can be displayed in the console or UI
-     * This provides a quick overview of the test results
+     * Create a report summary that can be displayed in the console or UI This provides a quick
+     * overview of the test results
      * 
      * @param stats TestPlanStats from the test run
      * @return String summary of the test results
@@ -377,32 +378,37 @@ public abstract class BaseTest {
         if (stats == null) {
             return "No test statistics available.";
         }
-        
+
         StringBuilder summary = new StringBuilder();
         summary.append("\n============== PERFORMANCE TEST SUMMARY ==============\n");
         summary.append(String.format("Protocol: %s\n", lastProtocolUsed));
-        summary.append(String.format("Timestamp: %s\n", 
+        summary.append(String.format("Timestamp: %s\n",
                 LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
         summary.append(String.format("Total Samples: %d\n", stats.overall().samplesCount()));
         summary.append(String.format("Duration: %d seconds\n", stats.duration().getSeconds()));
-        summary.append(String.format("Average Response Time: %s ms\n", stats.overall().sampleTime().mean()));
-        summary.append(String.format("Median Response Time: %s ms\n", stats.overall().sampleTime().median()));
-        summary.append(String.format("90th Percentile: %s ms\n", stats.overall().sampleTime().perc90()));
-        summary.append(String.format("Error Rate: %.2f%%\n", 
+        summary.append(String.format("Average Response Time: %s ms\n",
+                stats.overall().sampleTime().mean()));
+        summary.append(String.format("Median Response Time: %s ms\n",
+                stats.overall().sampleTime().median()));
+        summary.append(
+                String.format("90th Percentile: %s ms\n", stats.overall().sampleTime().perc90()));
+        summary.append(String.format("Error Rate: %.2f%%\n",
                 stats.overall().errorsCount() * 100.0 / stats.overall().samplesCount()));
-        
+
         // Calculate throughput
-        double durationSeconds = stats.duration().getSeconds() + stats.duration().getNano() / 1_000_000_000.0;
-        double throughput = durationSeconds > 0 ? stats.overall().samplesCount() / durationSeconds : 0;
+        double durationSeconds =
+                stats.duration().getSeconds() + stats.duration().getNano() / 1_000_000_000.0;
+        double throughput =
+                durationSeconds > 0 ? stats.overall().samplesCount() / durationSeconds : 0;
         summary.append(String.format("Throughput: %.2f requests/sec\n", throughput));
-        
+
         // Add report location
         if (lastReportFile != null) {
             summary.append(String.format("Report: %s\n", lastReportFile));
         }
-        
+
         summary.append("===================================================\n");
-        
+
         return summary.toString();
     }
 }

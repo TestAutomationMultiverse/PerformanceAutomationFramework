@@ -47,17 +47,17 @@ on:
       threshold_assertions:
         description: 'Enable performance threshold assertions'
         required: false
-        default: 'false'
+        default: false
         type: boolean
       upload_report:
         description: 'Upload report to GitHub Pages'
         required: true
-        default: 'true'
+        default: true
         type: boolean
       notify_slack:
         description: 'Send Slack notification with results'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 jobs:
@@ -73,8 +73,8 @@ jobs:
         distribution: 'temurin'
         cache: maven
     
-    - name: Build project
-      run: mvn -B clean package -DskipTests
+    - name: Build and run tests
+      run: mvn -B clean package -DskipTests=false
     
     - name: Set test parameters
       run: |
@@ -100,6 +100,7 @@ jobs:
       id: run_test
       run: |
         # Build command with parameters
+        chmod +x perftest.sh
         CMD="./perftest.sh run $PROTOCOL --threads=$THREADS --ramp-up=$RAMP_UP --duration=$DURATION"
         
         # Add additional parameters if provided
@@ -287,3 +288,4 @@ jobs:
         else
           echo "No previous test results found for comparison." >> $GITHUB_STEP_SUMMARY
         fi
+

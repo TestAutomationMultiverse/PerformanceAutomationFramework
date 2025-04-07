@@ -1,12 +1,9 @@
 package io.perftest.entities.request;
 
-import io.perftest.entities.base.Entity;
-
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Collections;
 import java.util.Map;
-import java.util.Collections;
+import io.perftest.entities.base.Entity;
 
 /**
  * Base class for all request entities
@@ -18,14 +15,14 @@ public class RequestEntity extends Entity {
     private int connectTimeout = 30000;
     private int responseTimeout = 60000;
     private Map<String, Object> assertions = new HashMap<>();
-    
+
     /**
      * Default constructor
      */
     public RequestEntity() {
         super();
     }
-    
+
     /**
      * Constructor with URL
      * 
@@ -35,50 +32,51 @@ public class RequestEntity extends Entity {
         super();
         this.url = url;
     }
-    
+
     /**
      * @return URL for the request
      */
     public String getUrl() {
         return url;
     }
-    
+
     /**
      * @param url URL for the request
      */
     public void setUrl(String url) {
         this.url = url;
     }
-    
+
     /**
      * @return HTTP method (GET, POST, PUT, DELETE, etc.)
      */
     public String getMethod() {
         return method;
     }
-    
+
     /**
      * @param method HTTP method (GET, POST, PUT, DELETE, etc.)
      */
     public void setMethod(String method) {
         this.method = method;
     }
-    
+
     /**
      * @return HTTP headers as a map
      */
     public Map<String, String> getHeaders() {
-        if (headers == null) return null;
+        if (headers == null)
+            return null;
         return Collections.unmodifiableMap(headers);
     }
-    
+
     /**
      * @param headers HTTP headers as a map
      */
     public void setHeaders(Map<String, String> headers) {
         this.headers = headers;
     }
-    
+
     /**
      * Add a header to the request
      * 
@@ -88,49 +86,49 @@ public class RequestEntity extends Entity {
     public void addHeader(String name, String value) {
         headers.put(name, value);
     }
-    
+
     /**
      * @return Connection timeout in milliseconds
      */
     public int getConnectTimeout() {
         return connectTimeout;
     }
-    
+
     /**
      * @param connectTimeout Connection timeout in milliseconds
      */
     public void setConnectTimeout(int connectTimeout) {
         this.connectTimeout = connectTimeout;
     }
-    
+
     /**
      * @return Response timeout in milliseconds
      */
     public int getResponseTimeout() {
         return responseTimeout;
     }
-    
+
     /**
      * @param responseTimeout Response timeout in milliseconds
      */
     public void setResponseTimeout(int responseTimeout) {
         this.responseTimeout = responseTimeout;
     }
-    
+
     /**
      * @return Assertions as a map
      */
     public Map<String, Object> getAssertions() {
         return assertions;
     }
-    
+
     /**
      * @param assertions Assertions as a map
      */
     public void setAssertions(Map<String, Object> assertions) {
         this.assertions = assertions;
     }
-    
+
     /**
      * Add an assertion for the response
      * 
@@ -140,7 +138,7 @@ public class RequestEntity extends Entity {
     public void addAssertion(String path, String expectedValue) {
         assertions.put(path, expectedValue);
     }
-    
+
     /**
      * Set the name of the request
      * 

@@ -1,7 +1,6 @@
 package io.perftest.demo;
 
 import us.abstracta.jmeter.javadsl.core.TestPlanStats;
-import us.abstracta.jmeter.javadsl.core.listeners.HtmlReporter;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Path;

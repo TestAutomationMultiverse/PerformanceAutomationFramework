@@ -3,7 +3,6 @@ package io.perftest.entities.test;
 import java.util.HashMap;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Collections;
 
 /**
  * Simplified TestEntity class that represents a performance test configuration

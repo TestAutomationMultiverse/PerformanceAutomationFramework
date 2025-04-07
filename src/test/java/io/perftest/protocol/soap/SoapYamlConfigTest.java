@@ -1,22 +1,21 @@
 package io.perftest.protocol.soap;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import io.perftest.components.soap.SoapComponent;
 import io.perftest.core.test.BaseTest;
 import io.perftest.engine.TestEngine;
 import io.perftest.entities.request.SoapRequestEntity;
 import io.perftest.systems.TestSystem;
 import io.perftest.util.YamlConfigLoader;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import us.abstracta.jmeter.javadsl.core.TestPlanStats;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Map;
 
 /**
  * Example test that loads SOAP test configuration from YAML
@@ -36,43 +35,46 @@ public class SoapYamlConfigTest extends BaseTest {
     public void testSoapWithYamlConfig() throws IOException {
         // Load configuration from YAML file
         Map<String, Object> config = YamlConfigLoader.loadConfig(CONFIG_FILE);
-        
+
         // Create test system with SOAP component
         TestSystem testSystem = new TestSystem();
         // Register the SOAP component to handle SoapRequestEntity instances
         testSystem.addComponent(SoapRequestEntity.class, new SoapComponent());
-        
+
         // Configure test engine from YAML
         TestEngine engine = configureTestEngine(testSystem, config);
-        
+
         // Set the protocol name to 'soap' for generating the report
         engine.setProtocolName("soap");
-        
+
         // Create and configure SOAP request entity from YAML
         SoapRequestEntity soapRequest = createSoapRequestEntity(config);
         engine.addRequest(soapRequest);
-        
+
         // Run the test
         TestPlanStats stats = engine.run();
-        
+
         // Log test results
         logTestResults(stats);
     }
-    
+
     @SuppressWarnings("unchecked")
     private SoapRequestEntity createSoapRequestEntity(Map<String, Object> config) {
-        Map<String, Object> requestConfig = (Map<String, Object>) config.getOrDefault("request", Map.of());
+        Map<String, Object> requestConfig =
+                (Map<String, Object>) config.getOrDefault("request", Map.of());
         String name = (String) requestConfig.getOrDefault("name", "SOAP Request");
-        String endpoint = (String) requestConfig.getOrDefault("endpoint", "https://example.com/soap");
+        String endpoint =
+                (String) requestConfig.getOrDefault("endpoint", "https://example.com/soap");
         String soapAction = (String) requestConfig.getOrDefault("soapAction", "");
-        String payload = (String) requestConfig.getOrDefault("payload", "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body></soap:Body></soap:Envelope>");
-        
+        String payload = (String) requestConfig.getOrDefault("payload",
+                "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body></soap:Body></soap:Envelope>");
+
         // Create entity with the URL and then set the other properties
         SoapRequestEntity entity = new SoapRequestEntity(endpoint);
         entity.setName(name);
         entity.setSoapAction(soapAction);
         entity.setPayload(payload);
-        
+
         // Set headers if present
         if (requestConfig.containsKey("headers")) {
             Map<String, Object> headers = (Map<String, Object>) requestConfig.get("headers");
@@ -80,7 +82,8 @@ public class SoapYamlConfigTest extends BaseTest {
                 entity.addHeader(header.getKey(), header.getValue().toString());
             }
         }
-        
+
         return entity;
     }
 }
+

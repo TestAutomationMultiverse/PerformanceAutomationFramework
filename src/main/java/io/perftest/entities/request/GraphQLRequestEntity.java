@@ -1,10 +1,9 @@
 package io.perftest.entities.request;
 
-import java.util.HashMap;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Collections;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -15,14 +14,14 @@ public class GraphQLRequestEntity extends RequestEntity {
     private String operationName;
     private Map<String, Object> variables = new HashMap<>();
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    
+
     /**
      * Default constructor
      */
     public GraphQLRequestEntity() {
         super();
     }
-    
+
     /**
      * Constructor with URL
      * 
@@ -32,50 +31,51 @@ public class GraphQLRequestEntity extends RequestEntity {
         super();
         setUrl(url);
     }
-    
+
     /**
      * @return GraphQL query
      */
     public String getQuery() {
         return query;
     }
-    
+
     /**
      * @param query GraphQL query
      */
     public void setQuery(String query) {
         this.query = query;
     }
-    
+
     /**
      * @return GraphQL operation name
      */
     public String getOperationName() {
         return operationName;
     }
-    
+
     /**
      * @param operationName GraphQL operation name
      */
     public void setOperationName(String operationName) {
         this.operationName = operationName;
     }
-    
+
     /**
      * @return GraphQL variables
      */
     public Map<String, Object> getVariables() {
-        if (variables == null) return null;
+        if (variables == null)
+            return null;
         return Collections.unmodifiableMap(variables);
     }
-    
+
     /**
      * @param variables GraphQL variables
      */
     public void setVariables(Map<String, Object> variables) {
         this.variables = variables;
     }
-    
+
     /**
      * Set variables from JSON string
      * 
@@ -94,7 +94,7 @@ public class GraphQLRequestEntity extends RequestEntity {
             throw new RuntimeException("Failed to parse variables JSON: " + e.getMessage(), e);
         }
     }
-    
+
     /**
      * Add a GraphQL variable
      * 
@@ -104,7 +104,7 @@ public class GraphQLRequestEntity extends RequestEntity {
     public void addVariable(String name, Object value) {
         variables.put(name, value);
     }
-    
+
     /**
      * Add a header to the request
      * 
@@ -114,7 +114,7 @@ public class GraphQLRequestEntity extends RequestEntity {
     public void addHeader(String name, String value) {
         getHeaders().put(name, value);
     }
-    
+
     /**
      * Add an assertion for the response
      * 
@@ -124,7 +124,7 @@ public class GraphQLRequestEntity extends RequestEntity {
     public void addAssertion(String path, String expectedValue) {
         getAssertions().put(path, expectedValue);
     }
-    
+
     /**
      * Set the name of the request
      * 

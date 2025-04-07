@@ -1,18 +1,14 @@
 package io.perftest.util;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
-
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.Yaml;
 
 /**
  * Utility class for loading and accessing YAML configuration files.
@@ -30,20 +26,20 @@ public class YamlConfigLoader {
     public static Map<String, Object> loadConfig(String filename) throws IOException {
         logger.info("Loading YAML configuration from {}", filename);
         Yaml yaml = new Yaml();
-        
-        try (InputStream inputStream = YamlConfigLoader.class.getClassLoader().getResourceAsStream(filename)) {
+
+        try (InputStream inputStream =
+                YamlConfigLoader.class.getClassLoader().getResourceAsStream(filename)) {
             if (inputStream == null) {
                 logger.error("Configuration file not found: {}", filename);
                 throw new IOException("Configuration file not found: " + filename);
             }
-            
-            @SuppressWarnings("unchecked")
+
             Map<String, Object> config = yaml.load(inputStream);
             if (config == null) {
                 logger.warn("Empty configuration file: {}", filename);
                 return Collections.emptyMap();
             }
-            
+
             logger.debug("Loaded configuration: {}", config);
             return config;
         } catch (Exception e) {
@@ -61,13 +57,14 @@ public class YamlConfigLoader {
      */
     public static String loadTemplateContent(String templatePath) throws IOException {
         logger.info("Loading template from {}", templatePath);
-        
-        try (InputStream inputStream = YamlConfigLoader.class.getClassLoader().getResourceAsStream(templatePath)) {
+
+        try (InputStream inputStream =
+                YamlConfigLoader.class.getClassLoader().getResourceAsStream(templatePath)) {
             if (inputStream == null) {
                 logger.error("Template file not found: {}", templatePath);
                 throw new IOException("Template file not found: " + templatePath);
             }
-            
+
             String content = new String(inputStream.readAllBytes());
             logger.debug("Loaded template content of size: {}", content.length());
             return content;
@@ -76,7 +73,7 @@ public class YamlConfigLoader {
             throw new IOException("Error loading template: " + e.getMessage(), e);
         }
     }
-    
+
     /**
      * Gets template paths from the templates section of a configuration map.
      *
@@ -90,10 +87,10 @@ public class YamlConfigLoader {
             logger.debug("No templates section found in configuration");
             return null;
         }
-        
+
         return getString(templates, templateType, null);
     }
-    
+
     /**
      * Gets a response template path from the templates section of a configuration.
      *
@@ -107,13 +104,13 @@ public class YamlConfigLoader {
             logger.debug("No templates section found in configuration");
             return null;
         }
-        
+
         Map<String, Object> responsePaths = getMap(templates, "responsePath");
         if (responsePaths.isEmpty()) {
             logger.debug("No responsePath section found in templates configuration");
             return null;
         }
-        
+
         return getString(responsePaths, responseType, null);
     }
 
@@ -158,9 +155,7 @@ public class YamlConfigLoader {
      * @return The string value or the default value
      */
     public static String getString(Map<String, Object> config, String key, String defaultValue) {
-        return Optional.ofNullable(config.get(key))
-                .map(Object::toString)
-                .orElse(defaultValue);
+        return Optional.ofNullable(config.get(key)).map(Object::toString).orElse(defaultValue);
     }
 
     /**
@@ -184,7 +179,7 @@ public class YamlConfigLoader {
         }
         return defaultValue;
     }
-    
+
     /**
      * Gets a boolean value from a configuration map with a default value.
      *
@@ -203,3 +198,4 @@ public class YamlConfigLoader {
         return defaultValue;
     }
 }
+
