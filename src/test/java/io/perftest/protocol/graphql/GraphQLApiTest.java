@@ -23,7 +23,6 @@ import java.util.Map;
  * Test that demonstrates GraphQL API testing
  */
 public class GraphQLApiTest extends BaseTest {
-    private static final Logger logger = LoggerFactory.getLogger(GraphQLApiTest.class);
 
     @BeforeEach
     public void setup() throws IOException {

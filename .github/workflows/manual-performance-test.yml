@@ -79,6 +79,7 @@ jobs:
     - name: Set test parameters
       run: |
         echo "PROTOCOL=${{ github.event.inputs.protocol }}" >> $GITHUB_ENV
+        echo "PROTOCOL=${{ github.event.inputs.protocol }}" >> $GITHUB_ENV
         echo "THREADS=${{ github.event.inputs.threads }}" >> $GITHUB_ENV
         echo "RAMP_UP=${{ github.event.inputs.ramp_up_seconds }}" >> $GITHUB_ENV
         echo "DURATION=${{ github.event.inputs.duration_seconds }}" >> $GITHUB_ENV
@@ -288,4 +289,6 @@ jobs:
         else
           echo "No previous test results found for comparison." >> $GITHUB_STEP_SUMMARY
         fi
+
+
 

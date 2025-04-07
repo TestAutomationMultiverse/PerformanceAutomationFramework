@@ -26,7 +26,6 @@ import java.nio.file.Paths;
  * Test that demonstrates using multiple protocols in a single test
  */
 public class MultiProtocolTest extends BaseTest {
-    private static final Logger logger = LoggerFactory.getLogger(MultiProtocolTest.class);
 
     @BeforeEach
     public void setup() throws IOException {

@@ -7,8 +7,6 @@ import java.nio.file.Paths;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import io.perftest.components.soap.SoapComponent;
 import io.perftest.core.test.BaseTest;
 import io.perftest.engine.TestEngine;
@@ -21,7 +19,6 @@ import us.abstracta.jmeter.javadsl.core.TestPlanStats;
  * Example test that loads SOAP test configuration from YAML
  */
 public class SoapYamlConfigTest extends BaseTest {
-    private static final Logger logger = LoggerFactory.getLogger(SoapYamlConfigTest.class);
     private static final String CONFIG_FILE = "soap-config.yml";
 
     @BeforeEach
@@ -79,11 +76,14 @@ public class SoapYamlConfigTest extends BaseTest {
         if (requestConfig.containsKey("headers")) {
             Map<String, Object> headers = (Map<String, Object>) requestConfig.get("headers");
             for (Map.Entry<String, Object> header : headers.entrySet()) {
-                entity.addHeader(header.getKey(), header.getValue().toString());
+                String key = header.getKey();
+                String value = header.getValue() == null ? "" : header.getValue().toString();
+                entity.addHeader(key, value);
             }
         }
 
         return entity;
     }
 }
+
 

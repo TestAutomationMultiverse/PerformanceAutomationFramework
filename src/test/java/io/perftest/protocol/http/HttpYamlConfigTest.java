@@ -24,7 +24,6 @@ import java.util.Map;
  * Test that loads HTTP test configuration from YAML
  */
 public class HttpYamlConfigTest extends BaseTest {
-    private static final Logger logger = LoggerFactory.getLogger(HttpYamlConfigTest.class);
     private static final String CONFIG_FILE = "http-config.yml";
 
     @BeforeEach

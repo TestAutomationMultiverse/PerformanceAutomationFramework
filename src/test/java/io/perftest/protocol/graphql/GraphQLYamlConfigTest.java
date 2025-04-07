@@ -120,7 +120,7 @@ public class GraphQLYamlConfigTest extends BaseTest {
             // Set headers from inline config
             Map<String, Object> headers = (Map<String, Object>) requestConfig.get("headers");
             for (Map.Entry<String, Object> header : headers.entrySet()) {
-                entity.addHeader(header.getKey(), header.getValue().toString());
+                entity.addHeader(header.getKey(), String.valueOf(header.getValue()));
             }
         }
 

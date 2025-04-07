@@ -229,3 +229,18 @@ After running tests, various reports are available:
 - JaCoCo coverage: `target/site/jacoco/index.html`
 - JMeter HTML reports: `target/html-reports/[protocol]/index.html`
 - SpotBugs reports: `target/spotbugs/spotbugs.html`
+
+### What's next
+
+- remove all old html repots and accociated code only keep unified-reports
+- Update code to support different http methods like get, post, put, delete for http protocol
+- Multi-protocol support (HTTP, GraphQL, SOAP/XML, JDBC)
+- Entity-Component-System (ECS) architecture
+- YAML/Data configuration-driven testing
+- Unified CLI tool (perftest.sh)
+- Advanced reporting capabilities
+- JMeter DSL integration
+- Comprehensive JUnit support
+- Enhanced error reporting
+- fix pom.xml package conflicts
+- GraphQLYamlConfigTest. testGraphQLWithYamlConfig:53->createGraphQLRequestEntity:110->lambda$createGraphQLRequestEntity$0:113 » UnsupportedOperation
