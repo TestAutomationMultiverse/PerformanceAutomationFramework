@@ -29,21 +29,17 @@
                 "redhat.vscode-xml",
                 "vscjava.vscode-maven",
                 "ms-azuretools.vscode-docker",
-                // "sonarsource.sonarlint-vscode",
                 "github.vscode-github-actions",
                 "eamodio.gitlens",
                 "HongYan.maven-cleaner",
-                // "vscjava.vscode-java-debug",
-                // "vscjava.vscode-java-dependency",
-                // "vscjava.vscode-java-test",
-                // "redhat.java",
                 "shengchen.vscode-checkstyle",
                 "vscjava.vscode-gradle",
                 "DavidAnson.vscode-markdownlint",
                 "christian-kohler.path-intellisense",
                 "richardwillis.vscode-spotbugs",
                 "github.vscode-pull-request-github",
-                "ms-vscode.vscode-typescript-tslint-plugin"
+                "ms-vscode.vscode-typescript-tslint-plugin",
+                "dhruv.maven-dependency-explorer"
             ],
             "settings": {
                 "java.configuration.updateBuildConfiguration": "automatic",
