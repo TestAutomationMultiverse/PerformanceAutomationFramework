@@ -1,4 +1,0 @@
-<Add xmlns="http://tempuri.org/">
-  <intA>{{ intA }}</intA>
-  <intB>{{ intB }}</intB>
-</Add>

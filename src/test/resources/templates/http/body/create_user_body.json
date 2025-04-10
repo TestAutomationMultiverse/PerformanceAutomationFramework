@@ -1,0 +1,11 @@
+{
+  "name": "${name}",
+  "email": "${email}",
+  "role": "${role}",
+  "active": true,
+  "created_by": "performance_test",
+  "metadata": {
+    "thread": "${threadNum}",
+    "iteration": "${iteration}"
+  }
+}

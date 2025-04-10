@@ -1,9 +1,0 @@
-query getCrocodileById($id: ID!) {
-  getCrocodileById(id: $id) {
-    id
-    name
-    sex
-    age
-    dateOfBirth
-  }
-}

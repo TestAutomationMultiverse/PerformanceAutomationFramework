@@ -1,0 +1,77 @@
+# Enhanced Performance Test Configuration
+protocol: http
+engine: JMDSL  # Can be JMDSL or JMAPI
+data: sample_HTTP_API_Test.csv
+
+# Global variables available to all scenarios and requests
+variables:
+  baseUrl: https://jsonplaceholder.typicode.com
+  timeout: 30000
+  contentType: application/json
+  version: 1.0.0
+
+# Execution configuration
+execution:
+  threads: 5
+  iterations: 10
+  rampUpSeconds: 2
+  holdSeconds: 5
+  duration: 60  # Maximum test duration in seconds
+  
+  # Execution-specific variables
+  variables:
+    connectionTimeout: 5000
+    socketTimeout: 30000
+    followRedirects: true
+
+# Test scenarios
+scenarios:
+  # HTTP API Test Scenario
+  HTTP API Test:
+    # Scenario-specific variables
+    variables:
+      apiVersion: v1
+      defaultHeaders: src/main/resources/templates/http/headers/default_headers.json
+    
+    # Requests in this scenario
+    requests:
+      - name: "Create User"
+        protocol: http  # Override global protocol if needed
+        endpoint: "/users"
+        method: "POST"
+        body: src/main/resources/templates/http/body/create_user_body.json
+        headers: src/main/resources/templates/http/headers/create_user_headers.json
+        params: src/main/resources/templates/http/params/create_user_params.template
+        
+        # Request-specific variables
+        variables:
+          userId: ${iteration}  # Using the current iteration as userId for more realistic testing
+          userName: "User ${iteration}"  # Dynamic user name based on iteration
+        
+        # Response validation schemas
+        responses:
+          'Passed': src/main/resources/templates/http/schema/create_user.schema.json
+          'Failed': src/main/resources/templates/http/schema/genericError.schema.json
+
+      - name: "Get Users"
+        endpoint: "/users"
+        method: "GET"
+        headers: src/main/resources/templates/http/headers/create_user_headers.json
+        params: src/main/resources/templates/http/params/create_user_params.template
+        
+        # Response validation schemas
+        responses:
+          'Passed': src/main/resources/templates/http/schema/create_user.schema.json
+          'Failed': src/main/resources/templates/http/schema/genericError.schema.json
+  
+  # HTTPS API Test Scenario
+  HTTPS API Test:
+    variables:
+      userId: ${iteration}  # Will be replaced with current iteration number
+    requests:
+      - name: "Get User Details"
+        protocol: https
+        endpoint: "/users/${userId}"
+        method: "GET"
+        responses:
+          'Passed': src/main/resources/templates/http/schema/create_user.schema.json

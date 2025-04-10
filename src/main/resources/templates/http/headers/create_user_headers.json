@@ -1,0 +1,6 @@
+{
+  "Content-Type": "application/json",
+  "Accept": "application/json",
+  "X-API-Version": "${apiVersion}",
+  "X-User-ID": "${userId}"
+}

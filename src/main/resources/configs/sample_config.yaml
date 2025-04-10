@@ -1,0 +1,60 @@
+name: HTTP API Performance Test Suite
+description: Comprehensive test suite for JSON placeholder API endpoints
+protocol: http   # Default protocol for all requests
+executionConfig:
+  threads: 5     # Number of concurrent threads (users)
+  iterations: 3  # Number of iterations per thread
+  rampUpSeconds: 2  # Time to ramp up to full thread count
+  holdSeconds: 1    # Time to maintain full load
+  # Reports will be saved in target/reports directory
+variables:
+  baseUrl: https://jsonplaceholder.typicode.com
+  userId: 1
+  postId: 1
+  timestamp: ${TIMESTAMP}  # Will be dynamically replaced at runtime
+
+scenarios:
+  - name: HTTP API Test
+    description: Testing HTTP endpoints with GET and POST methods
+    variables:
+      endpointUsers: /users
+      endpointPosts: /posts
+      requestTimeout: 5000
+    requests:
+      - name: Get Users
+        method: GET
+        endpoint: ${baseUrl}${endpointUsers}
+        headers:
+          Accept: application/json
+          User-Agent: Java-PerformanceTestFramework/1.0
+        params:
+          _limit: 10
+          
+      - name: Create User
+        method: POST
+        endpoint: ${baseUrl}${endpointUsers}
+        headers:
+          Content-Type: application/json
+          Accept: application/json
+        body: >
+          {
+            "name": "Performance Test User",
+            "username": "perftest",
+            "email": "test${timestamp}@example.com",
+            "phone": "555-123-4567"
+          }
+        
+  - name: HTTPS API Test
+    description: Testing secure HTTPS endpoints
+    variables:
+      userEndpoint: /users/${userId}
+      commentEndpoint: /posts/${postId}/comments
+    requests:
+      - name: Get User Details
+        method: GET
+        protocol: https  # Override global protocol setting
+        endpoint: ${baseUrl}${userEndpoint}
+        headers:
+          Accept: application/json
+        variables:
+          responseTimeout: 3000  # Request-specific variable

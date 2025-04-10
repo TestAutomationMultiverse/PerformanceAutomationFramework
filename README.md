@@ -1,246 +1,236 @@
-# Performance Automation Framework
+# Java Performance Testing Framework
 
-This project contains a comprehensive performance testing framework leveraging JMeter DSL for testing various API protocols. The framework follows the Entity-Component-System (ECS) architectural pattern and is designed to test HTTP, GraphQL, SOAP/XML services, and databases via JDBC.
-
-[![Manual Performance Test](https://github.com/username/jmeter-dsl-performance-framework/actions/workflows/manual-performance-test.yml/badge.svg)](https://github.com/username/jmeter-dsl-performance-framework/actions/workflows/manual-performance-test.yml)
-[![Build Status](https://github.com/username/jmeter-dsl-performance-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/username/jmeter-dsl-performance-framework/actions)
-[![Static Analysis](https://github.com/username/jmeter-dsl-performance-framework/actions/workflows/static-analysis.yml/badge.svg)](https://github.com/username/jmeter-dsl-performance-framework/actions)
-[![Release](https://img.shields.io/github/v/release/username/jmeter-dsl-performance-framework)](https://github.com/username/jmeter-dsl-performance-framework/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-## Recent Updates
-
-- **Fixed ConfigManager Security Issue**: Addressed the MS_EXPOSE_REP vulnerability in ConfigManager using enum-based singleton pattern and SpotBugs exclude configuration
-- **Resolved TestEngine Compilation Error**: Fixed error in TestEngine.java by replacing invalid getError() call with proper error code and message reporting
-- **Enhanced Security**: Implemented defensive copying across multiple classes to address EI_EXPOSE_REP and EI_EXPOSE_REP2 vulnerabilities
-- **Improved Documentation**: Updated security fixes documentation and added changelog
-- **Verified Build Process**: Successfully validated all fixes with specialized workflows
+A flexible, extensible Java framework for performing comprehensive performance testing across multiple protocols with advanced configuration options and intelligent reporting capabilities.
 
 ## Overview
 
-The Performance Automation Framework provides:
+This performance testing framework is designed to provide an intuitive, configurable approach to load and performance testing of APIs and services. Built on Java 19 with a modular architecture, it supports both programmatic test definition and YAML-based configuration.
 
-1. Multi-protocol support (HTTP, GraphQL, XML/SOAP, JDBC)
-2. Entity-Component-System (ECS) architecture
-3. YAML configuration-driven testing
-4. Fluent Java DSL for test definition
-5. Template-based request generation with Jinjava
-6. Data generation with JavaFaker
-7. Comprehensive JUnit integration
-8. JSON and XPath-based response validation
-9. Advanced performance metrics and reporting
-10. Cross-protocol testing in a single test class
-11. Real-time metrics visualization with Prometheus and Grafana
-12. Advanced code quality tools integration:
-    - SpotBugs for bug detection
-    - Checkstyle for code style enforcement
-    - JaCoCo for code coverage
-13. CI/CD with GitHub Actions (automated tests, static analysis, and releases)
-14. Comprehensive documentation with GitHub Pages
+Key features:
+- Multi-protocol support (HTTP, with planned extension to HTTPS, TCP, UDP, JDBC, JMS, MQTT)
+- Flexible test configuration through YAML files or direct Java API
+- Dynamic variable substitution for realistic test scenarios
+- CSV-driven parameterized testing
+- Comprehensive performance metrics with percentile calculations
+- Integration with JMeter reporting tools
+- Modular architecture for easy extension
 
-## Prerequisites
+## Architecture
 
-- Java 17+
-- Maven 3.8+
-- JMeter (handled automatically via JMeter DSL)
+The framework follows a layered architecture:
+
+```
+┌────────────────────────────────────────────────────────┐
+│                    User Interface                       │
+│  ┌─────────────────┐            ┌──────────────────┐   │
+│  │     YAML        │            │   Direct API     │   │
+│  │  Configuration  │            │      Usage       │   │
+│  └─────────────────┘            └──────────────────┘   │
+└────────────────────────────────────────────────────────┘
+                        │                  │
+                        ▼                  ▼
+┌────────────────────────────────────────────────────────┐
+│                 Test Execution Core                     │
+│  ┌─────────────────┐            ┌──────────────────┐   │
+│  │  Configuration  │            │   Test Runner    │   │
+│  │     Parser      │            │                  │   │
+│  └─────────────────┘            └──────────────────┘   │
+└────────────────────────────────────────────────────────┘
+                        │                  │
+                        ▼                  ▼
+┌────────────────────────────────────────────────────────┐
+│                 Engine Implementation                   │
+│  ┌─────────────────┐            ┌──────────────────┐   │
+│  │     JMeter      │            │  Custom Engine   │   │
+│  │   DSL Engine    │            │  Implementations │   │
+│  └─────────────────┘            └──────────────────┘   │
+└────────────────────────────────────────────────────────┘
+                        │                  │
+                        ▼                  ▼
+┌────────────────────────────────────────────────────────┐
+│                   Protocol Layer                        │
+│  ┌─────────────────┐            ┌──────────────────┐   │
+│  │      HTTP       │            │  Other Protocol  │   │
+│  │    Protocol     │            │  Implementations │   │
+│  └─────────────────┘            └──────────────────┘   │
+└────────────────────────────────────────────────────────┘
+                        │                  │
+                        ▼                  ▼
+┌────────────────────────────────────────────────────────┐
+│                    Target Systems                       │
+│  (HTTP APIs, Databases, Message Queues, etc.)          │
+└────────────────────────────────────────────────────────┘
+```
+
+### Core Components
+
+1. **Test Configuration**
+   - YAML Configuration Parser
+   - Direct Java API
+
+2. **Test Execution**
+   - Scenario Manager
+   - Request Builder
+   - Variable Resolver
+
+3. **Test Engines**
+   - JMeter DSL Engine
+   - Custom HTTP Engine
+   - Extensible Engine Interface
+
+4. **Protocol Support**
+   - HTTP/HTTPS Implementation
+   - Protocol Interface for Extensions
+
+5. **Reporting**
+   - Real-time Metrics
+   - HTML Report Generation
+   - JTL Export for JMeter Compatibility
+
+## Getting Started
+
+### Prerequisites
+- Java 19 or later
+- Maven 3.8 or later
+
+### Quick Start
+
+Run a sample performance test:
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/java-performance-framework.git
+cd java-performance-framework
+
+# Run with Maven
+mvn clean compile exec:java -Dexec.mainClass="io.perftest.JMeterDSLTest"
+```
+
+See the [Quickstart Guide](docs/QUICKSTART.md) for more examples.
+
+### Using YAML Configuration
+
+Create a YAML file defining your test:
+
+```yaml
+executionConfig:
+  threads: 5
+  iterations: 10
+  rampUpSeconds: 2
+  holdSeconds: 3
+
+variables:
+  baseUrl: https://jsonplaceholder.typicode.com
+  userId: 1
+
+protocolName: http
+
+scenarios:
+  - name: REST API Test
+    requests:
+      - name: Get User
+        method: GET
+        endpoint: ${baseUrl}/users/${userId}
+      
+      - name: Create Post
+        method: POST
+        endpoint: ${baseUrl}/posts
+        headers:
+          Content-Type: application/json
+        body: '{"title": "Test Post", "body": "This is a test post", "userId": ${userId}}'
+```
+
+Run the test using the YAML configuration:
+
+```bash
+mvn clean compile exec:java -Dexec.mainClass="io.perftest.App" -Dexec.args="your_config.yaml"
+```
+
+For more details on YAML configuration, see the [YAML Configuration Guide](docs/YAML_CONFIG.md).
+
+### Using the Java API
+
+```java
+import io.perftest.engine.JMDSLEngine;
+import io.perftest.model.ExecutionConfig;
+import io.perftest.model.Request;
+import io.perftest.model.TestResult;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class SimpleTest {
+    public static void main(String[] args) {
+        // Create execution configuration
+        ExecutionConfig config = new ExecutionConfig();
+        config.setThreads(5);
+        config.setIterations(10);
+        
+        // Initialize the engine
+        JMDSLEngine engine = new JMDSLEngine(config);
+        
+        // Set global variables
+        Map<String, String> variables = new HashMap<>();
+        variables.put("baseUrl", "https://jsonplaceholder.typicode.com");
+        variables.put("userId", "1");
+        engine.initialize(variables);
+        
+        // Create a request
+        Request request = new Request();
+        request.setName("Get User");
+        request.setProtocol("http");
+        request.setMethod("GET");
+        request.setEndpoint("${baseUrl}/users/${userId}");
+        
+        // Execute the request
+        TestResult result = engine.executeRequest(request);
+        
+        // Get performance metrics
+        Map<String, Object> metrics = engine.getMetrics();
+        System.out.println("Test Results:");
+        System.out.println("Success: " + result.isSuccess());
+        System.out.println("Response Time: " + result.getResponseTime() + "ms");
+        System.out.println("Success Rate: " + metrics.get("successRate") + "%");
+        
+        // Shut down the engine
+        engine.shutdown();
+    }
+}
+```
 
 ## Documentation
 
-The framework documentation is organized into the following sections:
+- [Quickstart Guide](docs/QUICKSTART.md)
+- [YAML Configuration Reference](docs/YAML_CONFIG.md)
+- [Extending the Framework](docs/EXTENDING.md)
 
-- [Code Quality](doc/code-quality.md) - Security fixes, code quality tools, and vulnerability management
-- [Security Fixes Summary](doc/security-fixes-summary.md) - Comprehensive overview of security vulnerability fixes
-- [Continuous Integration](doc/continuous-integration.md) - CI/CD workflows and automation
-- [Framework Architecture](doc/framework-architecture.md) - ECS pattern, components, and entity factory
-- [Example Tests](doc/example-tests.md) - Sample tests for each protocol (HTTP, GraphQL, JDBC, SOAP)
+## Features
 
-### Project Structure
+### Current Features
 
-```
-├── config/                   # Configuration files
-│   └── linting/              # Linting configuration
-│       └── spotbugs-exclude.xml  # SpotBugs exclusion patterns
-├── doc/                      # Documentation files
-│   ├── code-quality.md       # Code quality documentation
-│   ├── continuous-integration.md # CI/CD documentation
-│   ├── framework-architecture.md # Architecture documentation
-│   ├── example-tests.md      # Example tests documentation
-│   └── entity-factory.md     # Entity Factory documentation
-├── src/                      # Source code
-│   ├── main/                 # Main source code
-│   │   └── java/io/perftest/
-│   │       ├── components/   # Protocol-specific components
-│   │       ├── ecs/          # Entity-Component-System core
-│   │       │   └── exception/# Exception handling framework
-│   │       ├── engine/       # Test execution engine
-│   │       ├── systems/      # System-level management
-│   │       └── util/         # Utilities and helpers
-│   └── test/                 # Test source code
-│       └── java/io/perftest/
-│           ├── core/         # Core framework tests
-│           │   └── test/     # Base test classes and core tests
-│           └── protocol/     # Protocol-specific tests
-│               ├── http/     # HTTP/REST API tests
-│               ├── graphql/  # GraphQL API tests
-│               ├── jdbc/     # JDBC database tests
-│               ├── soap/     # SOAP/XML tests
-│               └── multi/    # Multi-protocol tests
-└── target/                   # Build output
-    ├── logs/                 # Test logs by protocol
-    ├── jtl-results/          # JMeter JTL results
-    ├── html-reports/         # HTML test reports
-    └── spotbugs/             # SpotBugs reports
-```
+- HTTP protocol support
+- Configurable thread and iteration count
+- Variable substitution
+- Request templating
+- Performance metrics collection
+- HTML report generation
+- CSV data-driven testing
+- JTL export for JMeter compatibility
 
-## Usage
+### Planned Features
 
-### Using the Unified CLI Tool
+- Support for additional protocols (HTTPS, TCP, UDP, JDBC, JMS, MQTT)
+- Advanced scenario flow control (conditions, loops)
+- Response validation
+- Response extraction for variables
+- Custom assertion support
+- Distributed testing
+- Real-time monitoring dashboard
 
-The framework provides a unified command-line interface through the `perftest.sh` script, which provides a simpler way to run tests and manage reports.
+## Contributing
 
-```bash
-# Check environment setup
-./perftest.sh setup
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-# Build the project
-./perftest.sh build
+## License
 
-# Run different types of tests
-./perftest.sh run simple              # Run a simple HTTP test
-./perftest.sh run http                # Run HTTP protocol tests
-./perftest.sh run graphql             # Run GraphQL protocol tests
-./perftest.sh run jdbc                # Run JDBC protocol tests
-./perftest.sh run soap                # Run SOAP protocol tests
-./perftest.sh run all                 # Run all protocol tests
-./perftest.sh run html-demo           # Run a simple HTML report demo
-./perftest.sh run full-demo           # Run the full HTML report demo
-
-# Generate and view reports
-./perftest.sh report --view           # Start a server to view example reports
-./perftest.sh report --generate --path=target/jtl-results/results.jtl  # Generate HTML report from JTL
-
-# Clean the build
-./perftest.sh clean
-
-# Get help on available commands
-./perftest.sh help
-```
-
-### Using Maven Directly
-
-Alternatively, you can use Maven commands directly:
-
-1. Navigate to the repository:
-
-```bash
-cd PerformanceAutomationFramework
-```
-
-2. Build the project:
-
-```bash
-mvn clean compile
-```
-
-3. Run the tests:
-
-```bash
-mvn test
-```
-
-4. Run a specific test:
-
-```bash
-# HTTP Tests
-mvn test -Dtest=SimpleTest
-mvn test -Dtest=CustomHttpTest
-mvn test -Dtest=HttpYamlConfigTest
-mvn test -Dtest=io.perftest.http_tests.K6PublicApiTest
-
-# GraphQL Tests
-mvn test -Dtest=GraphQLApiTest
-mvn test -Dtest=GraphQLYamlConfigTest
-mvn test -Dtest=io.perftest.graphql_tests.CountriesApiTest
-
-# SOAP Tests
-mvn test -Dtest=SoapYamlConfigTest
-
-# JDBC Tests
-mvn test -Dtest=SimpleJdbcTest
-mvn test -Dtest=JdbcYamlConfigTest
-
-# Multi-Protocol Tests
-mvn test -Dtest=MultiProtocolTest
-```
-
-## Development Environment
-
-This project includes a fully configured development environment using Visual Studio Code devcontainers. The devcontainer setup provides:
-
-### Features
-
-- Java 17 with Maven 3.9.5
-- Node.js 20.x (for potential future front-end components)
-- Apache JMeter 5.6.2 with essential plugins
-- Docker-in-Docker for running Prometheus and Grafana
-- Pre-configured code quality tools
-
-### IDE Extensions
-
-The development container automatically installs VS Code extensions for:
-
-- Java development and debugging
-- XML/YAML editing support
-- Maven integration
-- Docker management
-- Code quality tools (SonarLint, Checkstyle, SpotBugs)
-- GitHub integration (Actions, PR reviews)
-- Markdown linting
-
-### Getting Started with Devcontainer
-
-1. Install [Visual Studio Code](https://code.visualstudio.com/)
-2. Install the [Remote Development Extension Pack](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack)
-3. Clone this repository
-4. Open the repository folder in VS Code
-5. When prompted, click "Reopen in Container"
-   - Or use Command Palette (F1): "Remote-Containers: Reopen in Container"
-6. Wait for the container to build and initialize
-
-Once the container is ready, you'll have a fully configured environment with all necessary tools and dependencies.
-
-### Running Tests in the Development Environment
-
-```bash
-# Run all tests
-mvn test
-
-# Run a specific test class
-mvn test -Dtest=HttpYamlConfigTest
-
-# Run tests with JaCoCo coverage
-mvn test jacoco:report
-```
-
-### Viewing Reports
-
-After running tests, various reports are available:
-
-- JaCoCo coverage: `target/site/jacoco/index.html`
-- JMeter HTML reports: `target/html-reports/[protocol]/index.html`
-- SpotBugs reports: `target/spotbugs/spotbugs.html`
-
-### What's next
-
-- remove all old html repots and accociated code only keep unified-reports
-- Update code to support different http methods like get, post, put, delete for http protocol
-- Multi-protocol support (HTTP, GraphQL, SOAP/XML, JDBC)
-- Entity-Component-System (ECS) architecture
-- YAML/Data configuration-driven testing
-- Unified CLI tool (perftest.sh)
-- Advanced reporting capabilities
-- JMeter DSL integration
-- Comprehensive JUnit support
-- Enhanced error reporting
-- fix pom.xml package conflicts
-- GraphQLYamlConfigTest. testGraphQLWithYamlConfig:53->createGraphQLRequestEntity:110->lambda$createGraphQLRequestEntity$0:113 » UnsupportedOperation
+This project is licensed under the MIT License - see the LICENSE file for details.
