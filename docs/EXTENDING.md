@@ -1,127 +1,96 @@
 # Extending the Java Performance Testing Framework
 
-This guide provides instructions on how to extend the framework with new protocols, engines, and features.
+This guide provides instructions on how to extend the framework with new features.
 
 ## Table of Contents
 
-1. [Adding a New Protocol](#adding-a-new-protocol)
+1. [Extending the HTTP Protocol](#extending-the-http-protocol)
 2. [Creating a Custom Test Engine](#creating-a-custom-test-engine)
 3. [Enhancing Report Generation](#enhancing-report-generation)
 4. [Adding Custom Metrics](#adding-custom-metrics)
 
-## Adding a New Protocol
+## Extending the HTTP Protocol
 
-The framework uses the Protocol interface to abstract different communication protocols. Here's how to add a new one:
+The framework has been consolidated to focus on HTTP/HTTPS protocols. If you need to extend the HTTP protocol functionality, you can extend the existing `HttpProtocol` class:
 
-### Step 1: Implement the Protocol Interface
+### Step 1: Extend the HttpProtocol Class
 
-Create a new class that implements the `Protocol` interface:
+Create a new class that extends the `HttpProtocol` class:
 
 ```java
-package io.perftest.protocol;
+package io.perftest.protocols;
 
-import io.perftest.model.Request;
-import io.perftest.model.TestResult;
-
+import io.perftest.engine.Protocol;
+import io.perftest.model.Response;
 import java.util.Map;
 
-public class MyCustomProtocol implements Protocol {
+public class EnhancedHttpProtocol extends HttpProtocol {
     
+    // You can override methods to enhance functionality
     @Override
-    public TestResult execute(Request request, Map<String, String> variables) {
-        // Initialize test result
-        TestResult result = new TestResult();
-        result.setRequestName(request.getName());
-        result.setStartTime(System.currentTimeMillis());
+    public Response execute(String endpoint, String method, String body,
+                      Map<String, String> headers, Map<String, String> params,
+                      Map<String, String> requestVariables) throws Exception {
         
-        try {
-            // Implement your protocol-specific logic here
-            // For example, if this is an MQTT protocol:
-            // 1. Connect to MQTT broker
-            // 2. Subscribe or publish based on request
-            // 3. Measure response time
-            // 4. Set success status and response data
-            
-            // Simulate a successful response
-            Thread.sleep(50); // Simulate network delay
-            result.setSuccess(true);
-            result.setStatusCode(200);
-            result.setResponseBody("Protocol response data");
-            
-        } catch (Exception e) {
-            // Handle errors
-            result.setSuccess(false);
-            result.setStatusCode(500);
-            result.setErrorMessage(e.getMessage());
-        } finally {
-            // Calculate response time
-            result.setEndTime(System.currentTimeMillis());
-            result.setResponseTime(result.getEndTime() - result.getStartTime());
-        }
+        // Pre-processing logic
+        logRequest(endpoint, method, headers);
         
-        return result;
+        // Call the parent implementation
+        Response response = super.execute(endpoint, method, body, headers, params, requestVariables);
+        
+        // Post-processing logic
+        logResponse(response);
+        enhanceResponse(response);
+        
+        return response;
     }
-}
-```
-
-### Step 2: Register the Protocol in the Factory
-
-Update the `ProtocolFactory` class to include your new protocol:
-
-```java
-package io.perftest.protocol;
-
-public class ProtocolFactory {
     
-    public static Protocol getProtocol(String protocolName) {
-        if (protocolName == null || protocolName.isEmpty()) {
-            throw new IllegalArgumentException("Protocol name cannot be null or empty");
-        }
-        
-        switch (protocolName.toLowerCase()) {
-            case "http":
-                return new HttpProtocol();
-            case "https":
-                return new HttpProtocol(); // Reuse HTTP for HTTPS
-            case "mqtt":
-                return new MqttProtocol(); // Your new protocol
-            case "custom":
-                return new MyCustomProtocol(); // Your custom protocol
-            default:
-                throw new IllegalArgumentException("Unsupported protocol: " + protocolName);
-        }
+    private void logRequest(String endpoint, String method, Map<String, String> headers) {
+        // Custom request logging implementation
+        System.out.println("Enhanced HTTP Request: " + method + " " + endpoint);
+    }
+    
+    private void logResponse(Response response) {
+        // Custom response logging implementation
+        System.out.println("Enhanced HTTP Response: " + response.getStatusCode());
+    }
+    
+    private void enhanceResponse(Response response) {
+        // Add additional metrics or processing to the response
+        response.addHeader("X-Enhanced", "true");
     }
 }
 ```
 
-### Step 3: Use the New Protocol
+### Step 2: Register Your Enhanced Protocol
 
-Now you can use your new protocol in YAML configurations:
-
-```yaml
-scenarios:
-  - name: MQTT Test
-    requests:
-      - name: Publish Message
-        protocol: mqtt
-        method: PUBLISH
-        endpoint: mqtt://broker.example.com:1883/topic
-        body: '{"temperature": 25.5, "humidity": 60}'
-```
-
-Or programmatically:
+You can register your enhanced protocol in your custom engine or test class:
 
 ```java
-Protocol mqttProtocol = ProtocolFactory.getProtocol("mqtt");
+// Create an instance of your enhanced protocol
+Protocol enhancedProtocol = new EnhancedHttpProtocol();
+
+// Use it directly
 Request request = new Request();
-request.setName("MQTT Publish");
-request.setProtocol("mqtt");
-request.setMethod("PUBLISH");
-request.setEndpoint("mqtt://broker.example.com:1883/topic");
-request.setBody("{\"temperature\": 25.5, \"humidity\": 60}");
+request.setName("Enhanced Request");
+request.setMethod("GET");
+request.setEndpoint("https://api.example.com/resource");
 
 Map<String, String> variables = new HashMap<>();
-TestResult result = mqttProtocol.execute(request, variables);
+TestResult result = enhancedProtocol.execute(request, variables);
+```
+
+### Step 3: Use Your Enhanced Protocol
+
+You can use your enhanced protocol within your tests:
+
+```java
+// Create test with custom protocol
+JMDSLEngine engine = new JMDSLEngine(executionConfig);
+engine.setProtocol(new EnhancedHttpProtocol());
+
+// Execute the test with enhanced capabilities
+List<TestResult> results = engine.executeScenario("Test Scenario", requests);
 ```
 
 ## Creating a Custom Test Engine

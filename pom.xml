@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.perftest</groupId>
+    <groupId>io.ecs</groupId>
     <artifactId>java-performance-framework</artifactId>
     <version>1.0-SNAPSHOT</version>
 
@@ -99,12 +99,38 @@
             <version>1.7.30</version>
         </dependency>
         
-        <!-- JUnit for testing -->
+        <!-- JMeter Core for TreeBuilder API -->
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.12</version>
-            <scope>test</scope>
+            <groupId>org.apache.jmeter</groupId>
+            <artifactId>ApacheJMeter_core</artifactId>
+            <version>5.5</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.jmeter</groupId>
+            <artifactId>ApacheJMeter_http</artifactId>
+            <version>5.5</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.jmeter</groupId>
+            <artifactId>ApacheJMeter_components</artifactId>
+            <version>5.5</version>
+        </dependency>
+        
+        <!-- JUnit 5 for testing -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.9.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.9.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-launcher</artifactId>
+            <version>1.9.1</version>
         </dependency>
     </dependencies>
 
@@ -112,13 +138,8 @@
         <!-- Add resources directory for templates and other assets -->
         <resources>
             <resource>
-                <directory>src/main/resources</directory>
-                <filtering>false</filtering>
-            </resource>
-            <resource>
                 <directory>src/test/resources</directory>
                 <filtering>false</filtering>
-                <targetPath>${project.build.directory}/classes</targetPath>
             </resource>
         </resources>
         <testResources>
@@ -144,14 +165,14 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.0.0</version>
                 <configuration>
-                    <!-- Default to JMeterDSLTest class for exec:java -->
-                    <mainClass>io.perftest.JMeterDSLTest</mainClass>
+                    <!-- Default to MainRunner class for exec:java -->
+                    <mainClass>io.ecs.MainRunner</mainClass>
                     <includePluginDependencies>true</includePluginDependencies>
                     <classpathScope>compile</classpathScope>
                     <systemProperties>
                         <systemProperty>
                             <key>java.util.logging.config.file</key>
-                            <value>src/main/resources/logging.properties</value>
+                            <value>src/test/resources/logging.properties</value>
                         </systemProperty>
                     </systemProperties>
                 </configuration>
@@ -170,12 +191,30 @@
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>io.perftest.JMeterDSLTest</mainClass>
+                                    <mainClass>io.ecs.MainRunner</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.1.2</version>
+                <configuration>
+                    <includes>
+                        <include>**/*Test.java</include>
+                    </includes>
+                    <!-- Add additional classpath elements to help find classes -->
+                    <additionalClasspathElements>
+                        <additionalClasspathElement>${project.build.sourceDirectory}</additionalClasspathElement>
+                        <additionalClasspathElement>${project.build.testSourceDirectory}</additionalClasspathElement>
+                    </additionalClasspathElements>
+                    <useSystemClassLoader>true</useSystemClassLoader>
+                    <useManifestOnlyJar>false</useManifestOnlyJar>
+                </configuration>
             </plugin>
         </plugins>
     </build>

@@ -1,14 +1,17 @@
-# Java Performance Testing Framework Quickstart Guide
+# Java Performance Testing Framework - Quickstart Guide
 
 This guide provides a quick introduction to using the Java Performance Testing Framework for executing HTTP performance tests.
 
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
-2. [Running a Simple HTTP Test](#running-a-simple-http-test)
-3. [Using YAML Configuration](#using-yaml-configuration)
-4. [Analyzing Test Results](#analyzing-test-results)
-5. [Troubleshooting](#troubleshooting)
+2. [Installation](#installation)
+3. [Running Your First Test](#running-your-first-test)
+4. [Creating Custom Tests](#creating-custom-tests)
+5. [Using CSV Data Sources](#using-csv-data-sources)
+6. [Analyzing Test Results](#analyzing-test-results)
+7. [Troubleshooting](#troubleshooting)
+8. [Next Steps](#next-steps)
 
 ## Prerequisites
 
@@ -18,46 +21,54 @@ Before starting, ensure you have:
 - Maven 3.8 or later installed
 - Git to clone the repository (optional)
 
-## Running a Simple HTTP Test
+## Installation
+
+1. Clone the repository
+2. Build the project:
+
+```bash
+mvn clean compile
+```
+
+## Running Your First Test
 
 The framework provides two ways to run tests:
-1. Using direct Java code
-2. Using YAML configuration files
 
-### Method 1: Using Java Code
+### Method 1: Using JMeter DSL Test (Recommended)
 
-The simplest way to create a test is by using the JMeterDSLTest class:
+The simplest way to start is by running the pre-configured JMeter DSL test:
 
-```java
-// Clone the repository and navigate to the project directory
-git clone https://github.com/yourusername/java-performance-framework.git
-cd java-performance-framework
-
-// Run the existing sample test
-mvn clean compile exec:java -Dexec.mainClass="io.perftest.JMeterDSLTest"
+```bash
+mvn exec:java -Dexec.mainClass="io.perftest.JMeterDSLTest"
 ```
+
+This will:
+1. Run a sample performance test against public test endpoints
+2. Generate an HTML report in the `target/reports/jmeter-dsl-test` directory
+3. Create JTL files in the `target/jmeter-reports` directory
+4. Display test metrics in the console output
 
 The sample test in JMeterDSLTest.java includes:
 - A GET request test to retrieve users
-- A POST request test to create a new user
-- Basic performance metrics collection
+- A POST request test to create a new post
+- Basic performance metrics collection and reporting
 
-### Method 2: Using the App Class
+### Method 2: Using YAML Configuration
 
-You can also run tests using the App class:
+You can also run tests using a YAML configuration file:
 
 ```bash
-mvn clean compile exec:java -Dexec.mainClass="io.perftest.App" -Dexec.args="sample_config.yaml"
+mvn exec:java -Dexec.mainClass="io.perftest.App" -Dexec.args="src/main/resources/configs/sample_config.yaml"
 ```
 
-## Using YAML Configuration
+## Creating Custom Tests
 
-Creating tests with YAML provides a more flexible approach without changing code:
+### Option 1: Create a Custom YAML Configuration
 
-1. Create a YAML configuration file:
+Create a YAML file with your test scenarios:
 
 ```yaml
-# sample_config.yaml
+# test_config.yaml
 executionConfig:
   threads: 5
   iterations: 10
@@ -75,18 +86,11 @@ scenarios:
     variables:
       scenarioVar: value1
     requests:
-      - name: Get All Posts
-        protocol: http
-        method: GET
-        endpoint: ${baseUrl}/posts
-        
       - name: Get User
-        protocol: http
         method: GET
         endpoint: ${baseUrl}/users/${userId}
         
       - name: Create Post
-        protocol: http
         method: POST
         endpoint: ${baseUrl}/posts
         headers:
@@ -94,13 +98,74 @@ scenarios:
         body: '{"title": "Test Post", "body": "This is a test post", "userId": ${userId}}'
 ```
 
-2. Run the test using the App class:
+Then run it:
 
 ```bash
-mvn clean compile exec:java -Dexec.mainClass="io.perftest.App" -Dexec.args="sample_config.yaml"
+mvn exec:java -Dexec.mainClass="io.perftest.App" -Dexec.args="path/to/test_config.yaml"
 ```
 
-## Adding Data-Driven Testing
+### Option 2: Create a Custom Java Test Class
+
+Create a Java class that uses the framework's API:
+
+```java
+import io.perftest.engine.JMDSLEngine;
+import io.perftest.model.ExecutionConfig;
+import io.perftest.model.TestResult;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class MyTest {
+    public static void main(String[] args) throws Exception {
+        // Configure test
+        ExecutionConfig config = new ExecutionConfig();
+        config.setThreads(10);
+        config.setIterations(5);
+        config.setRampUpSeconds(2);
+        
+        // Set variables
+        Map<String, String> variables = new HashMap<>();
+        variables.put("baseUrl", "https://jsonplaceholder.typicode.com");
+        config.setVariables(variables);
+        
+        // Initialize engine
+        JMDSLEngine engine = new JMDSLEngine(config);
+        engine.initialize(variables);
+        
+        // Set headers
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json");
+        
+        // Execute test
+        List<TestResult> results = engine.executeJMeterDslTest(
+            "My API Test", 
+            "http", 
+            "${baseUrl}/users/1", 
+            "GET", 
+            null, 
+            headers, 
+            null
+        );
+        
+        // Print results
+        Map<String, Object> metrics = engine.getMetrics();
+        System.out.println("Success rate: " + metrics.get("successRate") + "%");
+        
+        // Cleanup
+        engine.shutdown();
+    }
+}
+```
+
+Then run your custom test:
+
+```bash
+mvn exec:java -Dexec.mainClass="MyTest"
+```
+
+## Using CSV Data Sources
 
 To run data-driven tests:
 
@@ -120,10 +185,9 @@ userId,postId,title
 scenarios:
   - name: Data-Driven Test
     dataFiles:
-      posts: sample_HTTP_API_Test.csv
+      posts: data/sample_HTTP_API_Test.csv
     requests:
       - name: Get Post by ID
-        protocol: http
         method: GET
         endpoint: ${baseUrl}/posts/${postId}
         dataSource: posts
@@ -137,22 +201,16 @@ After running a test, the framework generates:
    - Total request count
    - Success rate
    - Average response time
-   - 90th and 95th percentiles
+   - 90th percentile response time
 
 2. HTML report files in the `target/reports` directory:
    - For JMeter DSL tests: `target/reports/jmeter-dsl-test/performance_report_TIMESTAMP.html`
-   - For direct HTTP tests: `target/reports/direct-http-test/http_test_report_TIMESTAMP.html`
+   - These reports include charts, graphs, and detailed statistics
 
-3. JTL files for compatibility with JMeter reporting tools
-
-## Customizing Tests
-
-To customize tests:
-
-1. Modify the threads and iterations in the YAML configuration or Java code
-2. Add custom headers, parameters, and authentication
-3. Use variable substitution with `${variableName}` syntax
-4. Create custom scenarios with different request sequences
+3. JTL files in the `target/jmeter-reports` directory for compatibility with JMeter reporting tools:
+   - Format: `<request_name>_<timestamp>.jtl`
+   - Standard JMeter CSV format with all required columns (timeStamp, elapsed, label, responseCode, etc.)
+   - Can be imported into JMeter for further analysis
 
 ## Troubleshooting
 
@@ -196,6 +254,7 @@ If tests run slow:
 After mastering the basics, explore:
 - [YAML Configuration Guide](YAML_CONFIG.md) for detailed configuration options
 - [Extending the Framework](EXTENDING.md) to add custom protocols and features
-- API documentation in the JavaDocs
+- [Usage Guide](USAGE.md) for more detailed examples
+- [Architecture Overview](ARCHITECTURE.md) to understand the framework's design
 
-For more detailed information, refer to the [full documentation](../README.md).
+For more comprehensive information, refer to the [main README](../README.md).

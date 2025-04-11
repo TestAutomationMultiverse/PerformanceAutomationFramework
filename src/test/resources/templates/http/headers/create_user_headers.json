@@ -1,7 +1,6 @@
 {
   "Content-Type": "application/json",
   "Accept": "application/json",
-  "Authorization": "Bearer ${token}",
-  "X-Trace-Id": "${traceId}",
-  "X-Request-ID": "${requestId}"
+  "X-API-Version": "${apiVersion}",
+  "X-User-ID": "${userId}"
 }

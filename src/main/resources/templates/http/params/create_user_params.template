@@ -1,4 +1,0 @@
-# Parameters for create user request
-userId=${userId}
-apiVersion=${apiVersion}
-detail=full

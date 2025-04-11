@@ -1,6 +1,0 @@
-name,email,role,token,traceId,requestId,trace,clientId
-John Doe,john.doe@example.com,admin,test-token-123,trace-123,req-123,true,client1
-Jane Smith,jane.smith@example.com,user,test-token-456,trace-456,req-456,false,client2
-Bob Johnson,bob.johnson@example.com,guest,test-token-789,trace-789,req-789,true,client3
-Alice Williams,alice.williams@example.com,user,test-token-101,trace-101,req-101,false,client4
-Charlie Brown,charlie.brown@example.com,admin,test-token-202,trace-202,req-202,true,client5

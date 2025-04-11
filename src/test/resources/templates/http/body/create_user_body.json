@@ -1,11 +1,7 @@
 {
-  "name": "${name}",
-  "email": "${email}",
-  "role": "${role}",
-  "active": true,
-  "created_by": "performance_test",
-  "metadata": {
-    "thread": "${threadNum}",
-    "iteration": "${iteration}"
-  }
+  "name": "${userName}",
+  "id": ${userId},
+  "email": "user${userId}@example.com",
+  "status": "active",
+  "created": "2023-01-01T00:00:00Z"
 }

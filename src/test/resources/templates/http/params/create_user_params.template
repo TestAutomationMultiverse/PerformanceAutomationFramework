@@ -1,6 +1,4 @@
-# Query parameters for create user request
-format=json
-verbose=true
-trace=${trace}
-source=performance_test
-client_id=${clientId}
+# Parameters for create user request
+userId=${userId}
+apiVersion=${apiVersion}
+detail=full

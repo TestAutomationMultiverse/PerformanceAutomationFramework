@@ -4,7 +4,7 @@ A flexible, extensible Java framework for performing comprehensive performance t
 
 ## Overview
 
-This performance testing framework is designed to provide an intuitive, configurable approach to load and performance testing of APIs and services. Built on Java 19 with a modular architecture, it supports both programmatic test definition and YAML-based configuration.
+This performance testing framework is designed to provide an intuitive, configurable approach to load and performance testing of APIs and services. Built on Java 19 with a modular architecture following the Entity Component System (ECS) pattern, it supports both programmatic test definition and YAML-based configuration.
 
 Key features:
 - Multi-protocol support (HTTP, with planned extension to HTTPS, TCP, UDP, JDBC, JMS, MQTT)
@@ -13,7 +13,9 @@ Key features:
 - CSV-driven parameterized testing
 - Comprehensive performance metrics with percentile calculations
 - Integration with JMeter reporting tools
-- Modular architecture for easy extension
+- Entity Component System (ECS) architecture for maximum flexibility and extensibility
+- JMeter-compatible JTL file format (CSV) for integration with existing JMeter tools
+- Standard and experimental JMeter engines (DSL and TreeBuilder)
 
 ## Architecture
 
@@ -75,7 +77,6 @@ The framework follows a layered architecture:
 
 3. **Test Engines**
    - JMeter DSL Engine
-   - Custom HTTP Engine
    - Extensible Engine Interface
 
 4. **Protocol Support**
@@ -84,8 +85,9 @@ The framework follows a layered architecture:
 
 5. **Reporting**
    - Real-time Metrics
-   - HTML Report Generation
-   - JTL Export for JMeter Compatibility
+   - JMeter-style HTML Report Generation
+   - Standard JTL Export in JMeter CSV Format
+   - Comprehensive Visualization of Test Results
 
 ## Getting Started
 
@@ -203,6 +205,8 @@ public class SimpleTest {
 - [Quickstart Guide](docs/QUICKSTART.md)
 - [YAML Configuration Reference](docs/YAML_CONFIG.md)
 - [Extending the Framework](docs/EXTENDING.md)
+- [Usage Guide](docs/USAGE.md)
+- [Architecture Overview](docs/ARCHITECTURE.md)
 
 ## Features
 
@@ -213,9 +217,11 @@ public class SimpleTest {
 - Variable substitution
 - Request templating
 - Performance metrics collection
-- HTML report generation
+- JMeter-style HTML report generation with color-coded metrics
 - CSV data-driven testing
-- JTL export for JMeter compatibility
+- Standard JTL files in CSV format for JMeter compatibility
+- Detailed logging of test execution
+- Robust thread management through JMeter DSL
 
 ### Planned Features
 

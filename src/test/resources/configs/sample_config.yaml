@@ -17,6 +17,7 @@ execution:
   rampUpSeconds: 2
   holdSeconds: 5
   duration: 60  # Maximum test duration in seconds
+  successThreshold: 80.0  # Percentage of successful requests required for test to pass (default: 100%)
   
   # Execution-specific variables
   variables:
@@ -27,21 +28,22 @@ execution:
 # Test scenarios
 scenarios:
   # HTTP API Test Scenario
-  HTTP API Test:
+  - name: HTTP API Test
+    description: Testing HTTP endpoints with user operations
     # Scenario-specific variables
     variables:
       apiVersion: v1
-      defaultHeaders: src/main/resources/templates/http/headers/default_headers.json
+      defaultHeaders: src/test/resources/templates/http/headers/default_headers.json
     
     # Requests in this scenario
     requests:
       - name: "Create User"
         protocol: http  # Override global protocol if needed
-        endpoint: "/users"
+        endpoint: "https://jsonplaceholder.typicode.com/users"
         method: "POST"
-        body: src/main/resources/templates/http/body/create_user_body.json
-        headers: src/main/resources/templates/http/headers/create_user_headers.json
-        params: src/main/resources/templates/http/params/create_user_params.template
+        body: src/test/resources/templates/http/body/create_user_body.json
+        headers: src/test/resources/templates/http/headers/create_user_headers.json
+        params: src/test/resources/templates/http/params/create_user_params.template
         
         # Request-specific variables
         variables:
@@ -50,28 +52,29 @@ scenarios:
         
         # Response validation schemas
         responses:
-          'Passed': src/main/resources/templates/http/schema/create_user.schema.json
-          'Failed': src/main/resources/templates/http/schema/genericError.schema.json
+          'Passed': src/test/resources/templates/http/schema/create_user.schema.json
+          'Failed': src/test/resources/templates/http/schema/genericError.schema.json
 
       - name: "Get Users"
-        endpoint: "/users"
+        endpoint: "https://jsonplaceholder.typicode.com/users"
         method: "GET"
-        headers: src/main/resources/templates/http/headers/create_user_headers.json
-        params: src/main/resources/templates/http/params/create_user_params.template
+        headers: src/test/resources/templates/http/headers/create_user_headers.json
+        params: src/test/resources/templates/http/params/create_user_params.template
         
         # Response validation schemas
         responses:
-          'Passed': src/main/resources/templates/http/schema/create_user.schema.json
-          'Failed': src/main/resources/templates/http/schema/genericError.schema.json
+          'Passed': src/test/resources/templates/http/schema/create_user.schema.json
+          'Failed': src/test/resources/templates/http/schema/genericError.schema.json
   
   # HTTPS API Test Scenario
-  HTTPS API Test:
+  - name: HTTPS API Test
+    description: Testing secure HTTPS endpoints
     variables:
-      userId: ${iteration}  # Will be replaced with current iteration number
+      userId: 1
     requests:
       - name: "Get User Details"
         protocol: https
-        endpoint: "/users/${userId}"
+        endpoint: "https://jsonplaceholder.typicode.com/users/1"
         method: "GET"
         responses:
-          'Passed': src/main/resources/templates/http/schema/create_user.schema.json
+          'Passed': src/test/resources/templates/http/schema/create_user.schema.json
