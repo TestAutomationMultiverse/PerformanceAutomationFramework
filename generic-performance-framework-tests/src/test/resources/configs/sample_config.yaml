@@ -1,4 +1,4 @@
-# Enhanced Performance Test Configuration with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths
+# Enhanced Performance Test Configuration with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths
 protocol: http
 engine: JMDSL  # Can be JMDSL or JMAPI
 data: sample_HTTP_API_Test.csv  # Simplified path

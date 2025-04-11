@@ -1,4 +1,4 @@
-# Enhanced Performance Test Configuration with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths for Gatling with simplified paths
+# Enhanced Performance Test Configuration with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths for Gatling with simplified paths
 protocol: http
 engine: GATLING  # Using Gatling engine instead of JMDSL
 data: sample_HTTP_API_Test.csv  # Simplified path

@@ -1,4 +1,4 @@
-# Enhanced Performance Test Configuration with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths for JMeter TreeBuilder with simplified paths
+# Enhanced Performance Test Configuration with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths for JMeter TreeBuilder with simplified paths
 protocol: http
 engine: JMTREE  # Using JMeter TreeBuilder engine
 data: sample_HTTP_API_Test.csv  # Simplified path
