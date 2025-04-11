@@ -1,6 +1,5 @@
-package io.ecs;
+package io.ecs.model;
 
-import io.ecs.model.Request;
 import java.util.HashMap;
 import java.util.Map;
 

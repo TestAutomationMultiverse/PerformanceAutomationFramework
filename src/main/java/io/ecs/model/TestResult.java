@@ -18,6 +18,8 @@ public class TestResult {
     private Map<String, String> headers;
     private long receivedBytes;
     private long timestamp;  // Timestamp when the test was executed
+    private long startTime;   // Start time of the test execution
+    private long endTime;     // End time of the test execution
     
     // Additional fields to track request processing
     private String processedBody;       // Body with resolved variables
@@ -105,6 +107,22 @@ public class TestResult {
 
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public long getStartTime() {
+        return startTime;
+    }
+
+    public void setStartTime(long startTime) {
+        this.startTime = startTime;
+    }
+
+    public long getEndTime() {
+        return endTime;
+    }
+
+    public void setEndTime(long endTime) {
+        this.endTime = endTime;
     }
 
     public String getProcessedBody() {

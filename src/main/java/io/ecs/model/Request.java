@@ -58,8 +58,12 @@ public class Request {
         return body;
     }
 
-    public void setBody(String body) {
-        this.body = body;
+    public void setBody(Object body) {
+        if (body instanceof String) {
+            this.body = (String) body;
+        } else {
+            this.body = String.valueOf(body);
+        }
     }
 
     public Map<String, String> getHeaders() {
@@ -76,6 +80,15 @@ public class Request {
 
     public void setParams(Map<String, String> params) {
         this.params = params;
+    }
+    
+    /**
+     * Alias for setParams for backward compatibility
+     * 
+     * @param parameters Map of parameters to set
+     */
+    public void setParameters(Map<String, String> parameters) {
+        this.params = parameters;
     }
 
     public Map<String, String> getVariables() {

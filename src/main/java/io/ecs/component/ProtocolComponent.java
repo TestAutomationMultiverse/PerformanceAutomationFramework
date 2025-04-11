@@ -7,11 +7,10 @@ import io.ecs.engine.Protocol;
 import io.ecs.engine.ProtocolFactory;
 import io.ecs.protocols.HttpProtocol;
 import io.ecs.util.DynamicVariableResolver;
+import io.ecs.util.EcsLogger;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * ECS Component for handling protocol operations
@@ -20,7 +19,7 @@ import java.util.logging.Logger;
  * protocol capabilities that can be applied to request entities.
  */
 public class ProtocolComponent {
-    private static final Logger LOGGER = Logger.getLogger(ProtocolComponent.class.getName());
+    private static final EcsLogger logger = EcsLogger.getLogger(ProtocolComponent.class);
     
     private final Map<String, String> variables;
     private Protocol currentProtocol;
@@ -51,6 +50,19 @@ public class ProtocolComponent {
     public ProtocolComponent(String protocolType) {
         this.variables = new HashMap<>();
         this.currentProtocol = ProtocolFactory.createProtocol(protocolType);
+    }
+    
+    /**
+     * Create a new ProtocolComponent with the given variables
+     * 
+     * @param variables The variables to use in this component
+     */
+    public ProtocolComponent(Map<String, String> variables) {
+        this.variables = new HashMap<>();
+        if (variables != null) {
+            this.variables.putAll(variables);
+        }
+        this.currentProtocol = new HttpProtocol();
     }
     
     /**
@@ -96,19 +108,27 @@ public class ProtocolComponent {
             Request resolvedRequest = resolveVariables(request);
             
             // Execute the request with the current protocol
-            Response response = currentProtocol.executeRequest(resolvedRequest);
+            TestResult testResult = currentProtocol.execute(resolvedRequest);
+            
+            // Convert TestResult to Response
+            Response response = new Response();
+            response.setStatusCode(testResult.getStatusCode());
+            response.setSuccess(testResult.isSuccess());
+            response.setResponseTime(testResult.getResponseTime());
+            response.setBody(testResult.getResponseBody());
+            response.setError(testResult.getError());
             
             // Process any variables from the response
             processResponseVariables(response);
             
             return response;
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error executing request: " + request.getName(), e);
+            logger.error("Error executing request: {}", request.getName(), e);
             Response errorResponse = new Response();
             errorResponse.setSuccess(false);
             errorResponse.setStatusCode(0);
             errorResponse.setResponseTime(0);
-            errorResponse.setErrorMessage(e.getMessage());
+            errorResponse.setError(e.getMessage());
             return errorResponse;
         }
     }
@@ -162,11 +182,54 @@ public class ProtocolComponent {
      */
     private Request resolveVariables(Request request) {
         // Create a copy of the request
-        Request resolvedRequest = new Request(request);
+        Request resolvedRequest = new Request();
+        
+        // Copy properties from original request
+        resolvedRequest.setName(request.getName());
+        resolvedRequest.setProtocol(request.getProtocol());
+        resolvedRequest.setEndpoint(request.getEndpoint());
+        resolvedRequest.setMethod(request.getMethod());
+        resolvedRequest.setBody(request.getBody());
+        resolvedRequest.setBodyTemplate(request.getBodyTemplate());
+        resolvedRequest.setHeadersTemplate(request.getHeadersTemplate());
+        resolvedRequest.setParamsTemplate(request.getParamsTemplate());
+        resolvedRequest.setDataSource(request.getDataSource());
+        
+        // Copy maps
+        if (request.getHeaders() != null) {
+            resolvedRequest.setHeaders(new HashMap<>(request.getHeaders()));
+        }
+        if (request.getParams() != null) {
+            resolvedRequest.setParams(new HashMap<>(request.getParams()));
+        }
+        if (request.getVariables() != null) {
+            resolvedRequest.setVariables(new HashMap<>(request.getVariables()));
+        }
+        if (request.getAssertions() != null) {
+            resolvedRequest.setAssertions(new HashMap<>(request.getAssertions()));
+        }
+        if (request.getResponseValidators() != null) {
+            resolvedRequest.setResponseValidators(new HashMap<>(request.getResponseValidators()));
+        }
         
         // Resolve URL variables
-        String resolvedUrl = DynamicVariableResolver.resolveVariables(resolvedRequest.getUrl(), variables);
-        resolvedRequest.setUrl(resolvedUrl);
+        String url = resolvedRequest.getUrl();
+        if (url != null) {
+            String resolvedUrl = DynamicVariableResolver.resolveVariables(url, variables);
+            // We can't directly set URL as it's derived from endpoint, so we set the endpoint
+            if (resolvedUrl != null && !resolvedUrl.equals(url)) {
+                // Check if it has protocol prefix
+                if (resolvedUrl.startsWith("http://") || resolvedUrl.startsWith("https://")) {
+                    String protocol = resolvedUrl.startsWith("https://") ? "HTTPS" : "HTTP";
+                    resolvedRequest.setProtocol(protocol);
+                    // Remove protocol from URL to get endpoint
+                    String endpoint = resolvedUrl.substring(resolvedUrl.indexOf("://") + 3);
+                    resolvedRequest.setEndpoint(endpoint);
+                } else {
+                    resolvedRequest.setEndpoint(resolvedUrl);
+                }
+            }
+        }
         
         // Resolve header variables
         Map<String, String> resolvedHeaders = new HashMap<>();

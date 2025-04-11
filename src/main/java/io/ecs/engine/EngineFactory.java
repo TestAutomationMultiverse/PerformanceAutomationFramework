@@ -1,20 +1,19 @@
 package io.ecs.engine;
 
 import io.ecs.model.ExecutionConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.ecs.util.EcsLogger;
 
 /**
  * Factory for creating engine implementations
  */
 public class EngineFactory {
     
-    private static final Logger logger = LoggerFactory.getLogger(EngineFactory.class);
+    private static final EcsLogger logger = EcsLogger.getLogger(EngineFactory.class);
     
     /**
      * Get an engine implementation by name
      * 
-     * @param engineName Name of the engine (jmeter-dsl, jmeter-treebuilder, custom)
+     * @param engineName Name of the engine (jmeter-dsl, jmeter-treebuilder, gatling, custom)
      * @param config Configuration for the engine
      * @return Engine implementation
      */
@@ -35,8 +34,14 @@ public class EngineFactory {
                 
             case "jmeter-treebuilder":
             case "jmtree":
+            case "JMTREE":
                 logger.info("Creating JMeter TreeBuilder engine (experimental)");
                 return new JMTreeBuilderEngine(config);
+                
+            case "gatling":
+            case "GATLING":
+                logger.info("Creating Gatling engine");
+                return new GatlingEngine(config);
                 
             // Add more engines here as needed
                 

@@ -5,7 +5,7 @@ import io.ecs.entity.TestEntity;
 import io.ecs.component.ConfigComponent;
 import io.ecs.component.ProtocolComponent;
 import io.ecs.component.ReportingComponent;
-import io.ecs.model.Scenario;
+import io.ecs.config.Scenario;
 import io.ecs.model.Request;
 import io.ecs.model.TestResult;
 import io.ecs.model.ExecutionConfig;
@@ -13,6 +13,7 @@ import io.ecs.engine.Engine;
 import io.ecs.engine.EngineFactory;
 import io.ecs.util.CsvReader;
 import io.ecs.util.DynamicVariableResolver;
+import io.ecs.util.EcsLogger;
 
 import java.io.File;
 import java.time.LocalDateTime;
@@ -21,8 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.UUID;
 
 /**
  * ECS System for executing performance tests
@@ -31,12 +31,13 @@ import java.util.logging.Logger;
  * following the Entity-Component-System pattern.
  */
 public class TestExecutionSystem {
-    private static final Logger LOGGER = Logger.getLogger(TestExecutionSystem.class.getName());
+    private static final EcsLogger logger = EcsLogger.getLogger(TestExecutionSystem.class);
     
     private final String reportDirectory;
     private final Map<String, String> globalVariables;
     private final Map<String, Engine> engines;
     private final EntityManager entityManager;
+    private String defaultEngine = "jmdsl";
     
     /**
      * Create a test execution system with default report directory
@@ -177,6 +178,68 @@ public class TestExecutionSystem {
     }
     
     /**
+     * Add a model.Scenario to the system
+     * 
+     * @param modelScenario The model.Scenario to add
+     * @return This system for chaining
+     */
+    public TestExecutionSystem addScenario(io.ecs.model.Scenario modelScenario) {
+        // Create entity for this scenario if it doesn't exist
+        String entityName = modelScenario.getName();
+        TestEntity entity = null;
+        
+        for (TestEntity e : entityManager.getAllEntities()) {
+            if (e.getName().equals(entityName)) {
+                entity = e;
+                break;
+            }
+        }
+        
+        // Convert to config.Scenario
+        Scenario configScenario = new Scenario();
+        configScenario.setId(modelScenario.getId());
+        configScenario.setName(modelScenario.getName());
+        configScenario.setDescription(modelScenario.getDescription());
+        configScenario.setThreads(modelScenario.getThreads());
+        configScenario.setIterations(modelScenario.getIterations());
+        configScenario.setRampUp(modelScenario.getRampUp());
+        configScenario.setHold(modelScenario.getHold());
+        configScenario.setEngine(modelScenario.getEngine());
+        configScenario.setSuccessThreshold(modelScenario.getSuccessThreshold());
+        configScenario.setRequests(new ArrayList<>(modelScenario.getRequests()));
+        configScenario.setVariables(new HashMap<>(modelScenario.getVariables()));
+        configScenario.setDataFiles(new HashMap<>(modelScenario.getDataFiles()));
+        
+        if (entity == null) {
+            // Create new entity with components
+            entity = entityManager.createEntity(entityName);
+            
+            // Add config component
+            ConfigComponent configComponent = new ConfigComponent();
+            configComponent.addScenario(configScenario);
+            entity.addComponent(ConfigComponent.class, configComponent);
+            
+            // Add reporting component
+            entity.addComponent(ReportingComponent.class, new ReportingComponent(reportDirectory));
+            
+            // Add protocol component
+            entity.addComponent(ProtocolComponent.class, new ProtocolComponent());
+        } else {
+            // Update existing entity's config component
+            ConfigComponent configComponent = entity.getComponent(ConfigComponent.class);
+            if (configComponent != null) {
+                configComponent.addScenario(configScenario);
+            } else {
+                configComponent = new ConfigComponent();
+                configComponent.addScenario(configScenario);
+                entity.addComponent(ConfigComponent.class, configComponent);
+            }
+        }
+        
+        return this;
+    }
+    
+    /**
      * Add a data file to be used in the test
      * 
      * @param name Name to reference the data file
@@ -199,9 +262,9 @@ public class TestExecutionSystem {
                 }
             }
             
-            LOGGER.info("Added data file: " + name + " with " + data.size() + " records");
+            logger.info("Added data file: {} with {} records", name, data.size());
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error loading data file: " + e.getMessage(), e);
+            logger.error("Error loading data file: {}", e.getMessage(), e);
         }
         return this;
     }
@@ -241,7 +304,7 @@ public class TestExecutionSystem {
                 }
             }
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error loading YAML config: " + e.getMessage(), e);
+            logger.error("Error loading YAML config: {}", e.getMessage(), e);
         }
         
         return this;
@@ -256,7 +319,7 @@ public class TestExecutionSystem {
     private Map<String, Object> executeEntity(TestEntity entity) {
         if (!entity.hasComponent(ConfigComponent.class) || 
             !entity.hasComponent(ReportingComponent.class)) {
-            LOGGER.warning("Entity " + entity.getName() + " is missing required components for test execution");
+            logger.warn("Entity {} is missing required components for test execution", entity.getName());
             return null;
         }
         
@@ -266,7 +329,7 @@ public class TestExecutionSystem {
         // Get the scenario from the config component
         List<Scenario> scenarios = configComponent.getScenarios();
         if (scenarios.isEmpty()) {
-            LOGGER.warning("No scenarios found for entity: " + entity.getName());
+            logger.warn("No scenarios found for entity: {}", entity.getName());
             return null;
         }
         
@@ -274,7 +337,7 @@ public class TestExecutionSystem {
         Scenario scenario = scenarios.get(0);
         
         try {
-            LOGGER.info("Executing scenario: " + scenario.getName());
+            logger.info("Executing scenario: {}", scenario.getName());
             
             // Combine global variables with scenario variables
             Map<String, String> combinedVariables = new HashMap<>(globalVariables);
@@ -297,7 +360,7 @@ public class TestExecutionSystem {
             }
             
             // Get or create appropriate engine
-            String engineType = scenario.getEngine() != null ? scenario.getEngine() : "jmdsl";
+            String engineType = scenario.getEngine() != null ? scenario.getEngine() : defaultEngine;
             Engine engine = engines.computeIfAbsent(
                 engineType + "_" + scenario.getName(),
                 k -> EngineFactory.getEngine(engineType, config)
@@ -319,7 +382,9 @@ public class TestExecutionSystem {
             Map<String, Object> metrics = new HashMap<>();
             
             // Initialize reporting
-            reportingComponent.initializeReporting(scenario);
+            // Convert config.Scenario to model.Scenario if needed for reporting
+            io.ecs.model.Scenario modelScenario = configComponent.convertToModelScenario(scenario);
+            reportingComponent.initializeReporting(modelScenario);
             
             // Execute each request
             boolean anyRequestSuccessful = false;
@@ -335,10 +400,10 @@ public class TestExecutionSystem {
                 }
                 
                 // Log result
-                LOGGER.info("Request: " + request.getName() + " completed");
-                LOGGER.info("Success: " + result.isSuccess());
-                LOGGER.info("Status code: " + result.getStatusCode());
-                LOGGER.info("Response time: " + result.getResponseTime() + "ms");
+                logger.info("Request: {} completed", request.getName());
+                logger.info("Success: {}", result.isSuccess());
+                logger.info("Status code: {}", result.getStatusCode());
+                logger.info("Response time: {}ms", result.getResponseTime());
                 
                 // Get current metrics
                 metrics = engine.getMetrics();
@@ -358,12 +423,12 @@ public class TestExecutionSystem {
             
             // Generate report
             String reportPath = reportingComponent.generateReport(results.get(results.size() - 1));
-            LOGGER.info("Test report generated at: " + reportPath);
+            logger.info("Test report generated at: {}", reportPath);
             
             return metrics;
             
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error executing scenario " + scenario.getName() + ": " + e.getMessage(), e);
+            logger.error("Error executing scenario {}: {}", scenario.getName(), e.getMessage(), e);
             e.printStackTrace();
             return null;
         }
@@ -410,6 +475,32 @@ public class TestExecutionSystem {
     }
     
     /**
+     * Run a specific model.Scenario
+     * 
+     * @param modelScenario The model.Scenario to run
+     * @return Aggregate test results
+     */
+    public Map<String, Object> executeScenario(io.ecs.model.Scenario modelScenario) {
+        // Convert to config.Scenario
+        Scenario configScenario = new Scenario();
+        configScenario.setId(modelScenario.getId());
+        configScenario.setName(modelScenario.getName());
+        configScenario.setDescription(modelScenario.getDescription());
+        configScenario.setThreads(modelScenario.getThreads());
+        configScenario.setIterations(modelScenario.getIterations());
+        configScenario.setRampUp(modelScenario.getRampUp());
+        configScenario.setHold(modelScenario.getHold());
+        configScenario.setEngine(modelScenario.getEngine());
+        configScenario.setSuccessThreshold(modelScenario.getSuccessThreshold());
+        configScenario.setRequests(new ArrayList<>(modelScenario.getRequests()));
+        configScenario.setVariables(new HashMap<>(modelScenario.getVariables()));
+        configScenario.setDataFiles(new HashMap<>(modelScenario.getDataFiles()));
+        
+        // Execute the converted scenario
+        return executeScenario(configScenario);
+    }
+    
+    /**
      * Run all scenarios in the system
      * 
      * @return List of aggregate test results
@@ -437,14 +528,15 @@ public class TestExecutionSystem {
      * @param metrics Metrics to log
      */
     public void logMetrics(String scenarioName, Map<String, Object> metrics) {
-        LOGGER.info("Scenario: " + scenarioName + " stats so far");
-        LOGGER.info("Total requests: " + metrics.getOrDefault("totalRequests", 0));
-        LOGGER.info("Success rate: " + metrics.getOrDefault("successRate", 0.0) + "%");
-        LOGGER.info("Average response time: " + metrics.getOrDefault("avgResponseTime", 0.0) + "ms");
-        LOGGER.info("Min/Max response time: " + metrics.getOrDefault("minResponseTime", 0) + "/" + 
-                    metrics.getOrDefault("maxResponseTime", 0) + "ms");
-        LOGGER.info("90th percentile: " + metrics.getOrDefault("percentile90", 0) + "ms");
-        LOGGER.info("--------------------------------------");
+        logger.info("Scenario: {} stats so far", scenarioName);
+        logger.info("Total requests: {}", metrics.getOrDefault("totalRequests", 0));
+        logger.info("Success rate: {}%", metrics.getOrDefault("successRate", 0.0));
+        logger.info("Average response time: {}ms", metrics.getOrDefault("avgResponseTime", 0.0));
+        logger.info("Min/Max response time: {}/{}ms", 
+                    metrics.getOrDefault("minResponseTime", 0),
+                    metrics.getOrDefault("maxResponseTime", 0));
+        logger.info("90th percentile: {}ms", metrics.getOrDefault("percentile90", 0));
+        logger.info("--------------------------------------");
     }
     
     /**
@@ -472,6 +564,41 @@ public class TestExecutionSystem {
      */
     public Map<String, String> getGlobalVariables() {
         return new HashMap<>(globalVariables);
+    }
+    
+    /**
+     * Set the default engine to use when no engine is specified in a scenario
+     * 
+     * @param engineType The default engine type (jmdsl, jmtree, gatling, etc.)
+     * @return This system for chaining
+     */
+    public TestExecutionSystem setDefaultEngine(String engineType) {
+        if (engineType != null && !engineType.isEmpty()) {
+            this.defaultEngine = engineType.trim().toLowerCase();
+            logger.info("Default engine set to: {}", this.defaultEngine);
+        }
+        return this;
+    }
+    
+    /**
+     * Shut down the test system and clean up resources
+     */
+    public void shutdown() {
+        // Clean up any resources
+        for (Engine engine : engines.values()) {
+            if (engine != null) {
+                try {
+                    engine.shutdown();
+                } catch (Exception e) {
+                    logger.error("Error shutting down engine: {}", e.getMessage(), e);
+                }
+            }
+        }
+        
+        // Clear collections
+        engines.clear();
+        
+        logger.info("TestExecutionSystem shutdown complete");
     }
     
     /**

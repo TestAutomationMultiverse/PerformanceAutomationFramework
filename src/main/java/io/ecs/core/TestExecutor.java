@@ -41,8 +41,8 @@ public class TestExecutor {
             dataSource = new CsvDataSource(config.getDataSource());
         }
         
-        // Execute each scenario
-        for (Scenario scenario : config.getScenarios()) {
+        // Execute each scenario (using model.Scenario for compatibility)
+        for (io.ecs.model.Scenario scenario : config.getModelScenarios()) {
             System.out.println("Executing scenario: " + scenario.getName());
             
             TestRunner runner = new TestRunner(

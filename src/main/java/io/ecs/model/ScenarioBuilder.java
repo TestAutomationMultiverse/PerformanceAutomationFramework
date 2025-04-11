@@ -1,7 +1,4 @@
-package io.ecs;
-
-import io.ecs.model.Scenario;
-import io.ecs.model.Request;
+package io.ecs.model;
 
 import java.util.HashMap;
 import java.util.Map;

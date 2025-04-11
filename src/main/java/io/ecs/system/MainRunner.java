@@ -92,9 +92,10 @@ public class MainRunner {
             
             // Execute all loaded scenarios
             testSystem.executeAllScenarios();
-        } catch (Exception e) {
-            logger.error("Error during test execution: {}", e.getMessage(), e);
-            throw e;
+        } finally {
+            // Clean up resources
+            // No shutdown method available in TestExecutionSystem
+            logger.info("Test execution completed.");
         }
     }
     

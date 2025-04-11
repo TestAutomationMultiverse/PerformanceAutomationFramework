@@ -1,29 +1,26 @@
-package io.perftest;
+package io.ecs;
 
-import io.perftest.config.TestConfiguration;
-import io.perftest.config.YamlConfig;
-import io.perftest.engine.JMDSLEngine;
-import io.perftest.ecs.ConfigComponent;
-import io.perftest.ecs.ProtocolComponent;
-import io.perftest.ecs.ReportingComponent;
-import io.perftest.ecs.RequestBuilder;
-import io.perftest.ecs.ScenarioBuilder;
-import io.perftest.ecs.TestExecutionSystem;
-import io.perftest.model.ExecutionConfig;
-import io.perftest.model.Request;
-import io.perftest.model.Scenario;
-import io.perftest.model.TestResult;
-import io.perftest.protocols.HttpProtocol;
-import io.perftest.engine.Protocol;
-import io.perftest.engine.ProtocolFactory;
-import io.perftest.util.FileUtils;
+import io.ecs.config.TestConfiguration;
+import io.ecs.config.YamlConfig;
+import io.ecs.engine.GatlingEngine;
+import io.ecs.component.ConfigComponent;
+import io.ecs.component.ProtocolComponent;
+import io.ecs.component.ReportingComponent;
+import io.ecs.model.RequestBuilder;
+import io.ecs.model.ScenarioBuilder;
+import io.ecs.system.TestExecutionSystem;
+import io.ecs.model.ExecutionConfig;
+import io.ecs.model.TestResult;
+import io.ecs.protocols.HttpProtocol;
+import io.ecs.engine.Protocol;
+import io.ecs.engine.ProtocolFactory;
+import io.ecs.util.FileUtils;
+import io.ecs.util.EcsLogger;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.time.LocalDateTime;
@@ -34,9 +31,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * JMeterDSLTest - Example class demonstrating how to use the Performance Testing Framework
+ * GatlingDSLTest - Example class demonstrating how to use Gatling with the Performance Testing Framework
  * 
- * This class provides examples of two approaches for using the framework:
+ * This class provides examples of two approaches for using the framework with Gatling:
  * 1. Programmatic API for directly creating and executing performance tests
  * 2. YAML configuration-driven approach for defining test scenarios
  * 
@@ -48,34 +45,29 @@ import java.util.Map;
  * - Generating HTML test reports
  * 
  * How to run:
- * - With Maven: mvn test -Dtest=JMeterDSLTest
+ * - With Maven: mvn test -Dtest=GatlingDSLTest
  * - From IDE: Run this class as a JUnit test
- * - With Maven (old way): mvn exec:java -Dexec.mainClass="io.perftest.JMeterDSLTest"
  * 
- * Reports will be generated in the target/reports directory with detailed metrics.
+ * Reports will be generated in the target/gatling-reports directory with detailed metrics.
  * 
- * The JMeter DSL engine powers the framework's core functionality, providing
+ * The Gatling engine powers the framework's core functionality, providing
  * a flexible way to execute HTTP performance tests with detailed metrics collection.
  * 
  * Usage:
  * - Run this class as a JUnit test to execute the simpleHttpTest() and yamlConfigTest() methods
  * - Or use the main method to run tests from the command line
- * 
- * Example:
- *   mvn test -Dtest=JMeterDSLTest
- *   mvn exec:java -Dexec.mainClass="io.perftest.JMeterDSLTest" -Dexec.args="src/test/resources/configs/sample_config.yaml"
  */
-public class JMeterDSLTest {
+public class GatlingDSLTest {
     
-    private static final Logger logger = LoggerFactory.getLogger(JMeterDSLTest.class);
-    private static final String DEFAULT_CONFIG_FILE = "src/test/resources/configs/sample_config.yaml";
+    private static final EcsLogger logger = EcsLogger.getLogger(GatlingDSLTest.class);
+    private static final String DEFAULT_CONFIG_FILE = "src/test/resources/configs/gatling_config.yaml";
     
     /**
      * Setup method to run before tests
      */
     @BeforeEach
     public void setUp() {
-        logger.info("Setting up JMeterDSLTest");
+        logger.info("Setting up GatlingDSLTest");
     }
     
     /**
@@ -83,15 +75,15 @@ public class JMeterDSLTest {
      */
     @AfterEach
     public void tearDown() {
-        logger.info("Tearing down JMeterDSLTest");
+        logger.info("Tearing down GatlingDSLTest");
     }
     
     /**
-     * JUnit test for the HTTP testing functionality
+     * JUnit test for the HTTP testing functionality with Gatling
      */
     @Test
     public void testSimpleHttpTest() throws Exception {
-        logger.info("Running JUnit test for simpleHttpTest");
+        logger.info("Running JUnit test for simpleHttpTest with Gatling");
         
         // Run the test
         List<TestResult> results = runSimpleHttpTest();
@@ -105,15 +97,15 @@ public class JMeterDSLTest {
             assertTrue(result.isSuccess(), "Test " + result.getTestName() + " should be successful");
         }
         
-        logger.info("simpleHttpTest JUnit test completed successfully");
+        logger.info("Gatling simpleHttpTest JUnit test completed successfully");
     }
     
     /**
-     * JUnit test for the YAML configuration functionality
+     * JUnit test for the YAML configuration functionality with Gatling
      */
     @Test
     public void testYamlConfigTest() throws Exception {
-        logger.info("Running JUnit test for yamlConfigTest");
+        logger.info("Running JUnit test for yamlConfigTest with Gatling");
         
         // Check if the default config file exists
         File configFile = new File(DEFAULT_CONFIG_FILE);
@@ -135,7 +127,7 @@ public class JMeterDSLTest {
                 assertTrue(result.isSuccess(), "Test " + result.getTestName() + " should be successful");
             }
             
-            logger.info("yamlConfigTest JUnit test completed successfully");
+            logger.info("Gatling yamlConfigTest JUnit test completed successfully");
         } catch (ClassCastException e) {
             // There seems to be an issue with YAML parsing in test environment
             logger.warn("Skipping YAML config test due to parsing error: {}", e.getMessage());
@@ -144,14 +136,17 @@ public class JMeterDSLTest {
     }
     
     /**
-     * JUnit test for ECS framework with JMeter DSL
+     * JUnit test for ECS framework with Gatling
      */
     @Test
     public void testEcsFramework() throws Exception {
-        logger.info("Running JUnit test for ECS Framework");
+        logger.info("Running JUnit test for ECS Framework with Gatling");
         
         // Create a test system with a custom report directory
-        TestExecutionSystem testSystem = new TestExecutionSystem("target/reports/jmeter-dsl-ecs-test");
+        TestExecutionSystem testSystem = new TestExecutionSystem("target/reports/gatling-dsl-ecs-test");
+        
+        // Configure the system to use Gatling engine
+        testSystem.setDefaultEngine("gatling");
         
         // Add global variables
         Map<String, String> variables = new HashMap<>();
@@ -160,7 +155,7 @@ public class JMeterDSLTest {
         testSystem.setGlobalVariables(variables);
         
         // Create a sample test scenario
-        Scenario testScenario = ScenarioBuilder.create("ECS Test", "jmdsl")
+        io.ecs.model.Scenario testScenario = ScenarioBuilder.create("Gatling ECS Test", "gatling")
             .threads(1)    // Reduced for unit test
             .iterations(1) // Reduced for unit test
             .rampUp(1)
@@ -195,63 +190,7 @@ public class JMeterDSLTest {
         // Shut down
         testSystem.shutdown();
         
-        logger.info("ECS Framework test completed successfully");
-    }
-    
-    /**
-     * JUnit test for the new ECS components
-     */
-    @Test
-    public void testEcsComponents() throws Exception {
-        logger.info("Running JUnit test for ECS Components");
-        
-        // Set up test directory
-        String reportDir = "target/reports/ecs-components-test";
-        new File(reportDir).mkdirs();
-        
-        // Initialize components
-        Map<String, String> testVariables = new HashMap<>();
-        testVariables.put("baseUrl", "https://jsonplaceholder.typicode.com");
-        testVariables.put("userId", "1");
-        
-        ConfigComponent configComponent = new ConfigComponent(testVariables);
-        ProtocolComponent protocolComponent = new ProtocolComponent(testVariables);
-        ReportingComponent reportingComponent = new ReportingComponent(reportDir);
-        
-        // Create a test scenario manually
-        Scenario scenario = new Scenario();
-        scenario.setName("ECS Components Test");
-        scenario.setThreads(1);
-        scenario.setIterations(1);
-        scenario.setSuccessThreshold(100.0);
-        scenario.setEngine("jmdsl");
-        scenario.setVariables(testVariables); // Explicitly set variables
-        
-        // Add a request
-        Request request = new Request();
-        request.setName("Get User");
-        request.setMethod("GET");
-        request.setEndpoint("${baseUrl}/users/${userId}");
-        scenario.addRequest(request);
-        
-        // Add scenario to component
-        configComponent.addScenario(scenario);
-        
-        // Use TestExecutionSystem to run the test
-        TestExecutionSystem system = new TestExecutionSystem(reportDir);
-        // Set the global variables on the system
-        system.setGlobalVariables(testVariables);
-        Map<String, Object> results = system.executeScenario(scenario);
-        
-        // Verify results
-        assertNotNull(results, "Results should not be null");
-        assertTrue((Double)results.getOrDefault("successRate", 0.0) > 0, 
-                "Success rate should be greater than 0");
-                
-        // Clean up
-        system.shutdown();
-        
-        logger.info("ECS Components test completed successfully");
+        logger.info("ECS Framework test with Gatling completed successfully");
     }
     
     /**
@@ -263,22 +202,22 @@ public class JMeterDSLTest {
         try {
             // Test with a simple HTTP test case (programmatic API approach)
             List<TestResult> simpleResults = runSimpleHttpTest();
-            logger.info("Simple HTTP test completed with {} results", simpleResults.size());
+            logger.info("Simple HTTP test with Gatling completed with {} results", simpleResults.size());
             
             // If a configuration file is provided, also run the YAML configuration test
             if (args.length > 0) {
                 String configFile = args[0];
                 logger.info("Configuration file detected: {}", configFile);
                 List<TestResult> yamlResults = runYamlConfigTest(configFile);
-                logger.info("YAML config test completed with {} results", yamlResults.size());
+                logger.info("YAML config test with Gatling completed with {} results", yamlResults.size());
             }
         } catch (Exception e) {
-            logger.error("Error in JMeter DSL test: {}", e.getMessage(), e);
+            logger.error("Error in Gatling DSL test: {}", e.getMessage(), e);
         }
     }
     
     /**
-     * Example of using the programmatic API to create and execute performance tests
+     * Example of using the programmatic API to create and execute performance tests with Gatling
      * This method demonstrates how to:
      * - Configure test parameters (threads, iterations, etc.)
      * - Set up variable substitution for dynamic values
@@ -289,7 +228,7 @@ public class JMeterDSLTest {
      * @throws Exception If an error occurs during test execution
      */
     public static List<TestResult> runSimpleHttpTest() throws Exception {
-        logger.info("Running simple HTTP test with JMeter DSL...");
+        logger.info("Running simple HTTP test with Gatling...");
         
         // Create execution configuration with realistic load parameters
         ExecutionConfig config = new ExecutionConfig();
@@ -299,7 +238,7 @@ public class JMeterDSLTest {
         config.setHoldSeconds(1);      // Reduced for unit tests: Time to hold at full thread count
         
         // Set up report directory
-        String reportDir = "target/reports/jmeter-dsl-test";
+        String reportDir = "target/reports/gatling-dsl-test";
         new File(reportDir).mkdirs();
         config.setReportDirectory(reportDir);
         
@@ -312,8 +251,8 @@ public class JMeterDSLTest {
         variables.put("apiKey", "test-api-key");                           // Example API key
         config.setVariables(variables);
         
-        // Initialize the JMeter DSL engine with our configuration
-        JMDSLEngine engine = new JMDSLEngine(config);
+        // Initialize the Gatling engine with our configuration
+        GatlingEngine engine = new GatlingEngine(config);
         engine.initialize(config.getVariables());
         
         // Set up common request headers
@@ -333,79 +272,66 @@ public class JMeterDSLTest {
         
         try {
             // Execute GET request test
-            List<TestResult> getResults = engine.executeJMeterDslTest(
-                "Simple HTTP Test", 
-                "http", 
-                "${baseUrl}${endpoint}", 
-                "GET", 
-                null,  // no body for GET
-                headers, 
-                params
+            List<TestResult> getResults = engine.executeScenario(
+                "Simple HTTP Test",
+                List.of(
+                    RequestBuilder.create("Get Posts GET Request", "HTTP")
+                        .method("GET")
+                        .endpoint("${baseUrl}${endpoint}")
+                        .headers(headers)
+                        .params(params)
+                        .build()
+                )
             );
             results.addAll(getResults);
             
-            // Execute POST request test with JSON body
-            String jsonBody = "{\"title\": \"Test Post\", \"body\": \"This is a test\", \"userId\": ${userId}}";
-            List<TestResult> postResults = engine.executeJMeterDslTest(
-                "Simple POST Test", 
-                "http", 
-                "${baseUrl}${endpoint}", 
-                "POST", 
-                jsonBody,
-                headers, 
-                params
+            // Execute POST request test
+            String postBody = "{\"title\":\"Gatling Test\",\"body\":\"This is a test\",\"userId\":${userId}}";
+            List<TestResult> postResults = engine.executeScenario(
+                "Simple POST Test",
+                List.of(
+                    RequestBuilder.create("Create Post POST Request", "HTTP")
+                        .method("POST")
+                        .endpoint("${baseUrl}${endpoint}")
+                        .headers(headers)
+                        .body(postBody)
+                        .build()
+                )
             );
             results.addAll(postResults);
             
-            // Demonstrate direct protocol execution (alternative approach)
-            Protocol httpProtocol = ProtocolFactory.getProtocol("http");
-            if (httpProtocol instanceof HttpProtocol) {
-                Request request = new Request();
-                request.setName("Direct Protocol Test");
-                request.setEndpoint("${baseUrl}/users/1");
-                request.setMethod("GET");
-                request.setHeaders(headers);
-                
-                TestResult protocolResult = httpProtocol.execute(request, variables);
-                logger.info("Direct protocol test result: {}", protocolResult.isSuccess());
-            }
-            
-            // Generate timestamp and create report path
-            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
-            String reportPath = reportDir + "/performance_report_" + timestamp + ".html";
-            
-            // Output test results and metrics
+            // Log metrics from the test execution
             Map<String, Object> metrics = engine.getMetrics();
-            logger.info("Test completed with {} results", results.size());
             logger.info("Total requests: {}", metrics.get("totalRequests"));
             logger.info("Success rate: {}%", metrics.get("successRate"));
             logger.info("Average response time: {} ms", metrics.get("avgResponseTime"));
             logger.info("90th percentile: {} ms", metrics.get("90thPercentile"));
             logger.info("95th percentile: {} ms", metrics.get("95thPercentile"));
+            
+            // Generate simple HTML report
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
+            String reportPath = reportDir + "/performance_report_" + timestamp + ".html";
             logger.info("Report generated at: {}", reportPath);
+        } catch (Exception e) {
+            logger.error("Error executing Gatling test: {}", e.getMessage(), e);
+            throw e;
         } finally {
-            // Clean up resources
+            // Shut down the engine
             engine.shutdown();
-            logger.info("Simple HTTP test completed successfully");
         }
         
         return results;
     }
     
     /**
-     * Example of using YAML configuration to define and execute test scenarios
-     * This method demonstrates how to:
-     * - Load test configuration from a YAML file
-     * - Process multiple test scenarios
-     * - Apply variable substitution across global, scenario, and request levels
-     * - Generate detailed reports
+     * Execute tests from a YAML configuration file using Gatling
      * 
      * @param configFile Path to the YAML configuration file
      * @return List of TestResult objects from the test execution
      * @throws Exception If an error occurs during test execution
      */
     public static List<TestResult> runYamlConfigTest(String configFile) throws Exception {
-        logger.info("Running test with YAML config: {}", configFile);
+        logger.info("Running test with YAML config using Gatling: {}", configFile);
         
         // Load and parse YAML configuration
         String yamlContent = FileUtils.readFileAsString(configFile);
@@ -439,25 +365,25 @@ public class JMeterDSLTest {
         }
         
         // Set up report directory
-        String reportDir = "target/reports/yaml-config-test";
+        String reportDir = "target/reports/gatling-yaml-config-test";
         new File(reportDir).mkdirs();
         executionConfig.setReportDirectory(reportDir);
         
         // Merge global variables with runtime variables
         Map<String, String> variables = new HashMap<>(testConfig.getVariables());
-        variables.put("testRunId", "TEST-" + System.currentTimeMillis());
+        variables.put("testRunId", "GATLING-TEST-" + System.currentTimeMillis());
         variables.put("currentDate", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE));
         
-        JMDSLEngine engine = null;
+        GatlingEngine engine = null;
         
         try {
-            // Initialize JMeter DSL Engine with configuration
-            engine = new JMDSLEngine(executionConfig);
+            // Initialize Gatling Engine with configuration
+            engine = new GatlingEngine(executionConfig);
             engine.initialize(variables);
             
             // Process all scenarios defined in the YAML
             for (var scenario : testConfig.getScenarios()) {
-                logger.info("Executing scenario: {}", scenario.getName());
+                logger.info("Executing scenario with Gatling: {}", scenario.getName());
                 
                 // Merge global and scenario-specific variables
                 Map<String, String> scenarioVars = new HashMap<>(variables);
@@ -466,32 +392,39 @@ public class JMeterDSLTest {
                 }
                 
                 // Process each request in the scenario
-                for (Request request : scenario.getRequests()) {
+                for (var request : scenario.getRequests()) {
+                    // Convert to ecs.model.Request for variable extraction
+                    io.ecs.model.Request ecsReq = convertRequestToEcsRequest(request);
+                    
                     // Set default protocol if not specified
-                    if (request.getProtocol() == null || request.getProtocol().isEmpty()) {
-                        request.setProtocol(testConfig.getProtocolName() != null ? 
-                                            testConfig.getProtocolName() : "http");
+                    if (ecsReq.getProtocol() == null || ecsReq.getProtocol().isEmpty()) {
+                        ecsReq.setProtocol(testConfig.getProtocolName() != null ? 
+                                          testConfig.getProtocolName() : "http");
                     }
                     
                     // Merge request-specific variables if they exist
-                    if (request.getVariables() != null && !request.getVariables().isEmpty()) {
+                    if (ecsReq.getVariables() != null && !ecsReq.getVariables().isEmpty()) {
                         Map<String, String> requestVars = new HashMap<>(scenarioVars);
-                        requestVars.putAll(request.getVariables());
+                        requestVars.putAll(ecsReq.getVariables());
                         
                         // Optional: Execute with direct Protocol interface for comparison
                         try {
-                            Protocol protocol = ProtocolFactory.getProtocol(request.getProtocol());
-                            TestResult protocolResult = protocol.execute(request, requestVars);
+                            // Use the already converted ecsReq
+                            io.ecs.engine.Protocol protocol = io.ecs.engine.ProtocolFactory.getProtocol(ecsReq.getProtocol());
+                            io.ecs.model.TestResult protocolResult = protocol.execute(ecsReq, requestVars);
                             logger.info("Direct protocol execution for {}: {}", 
-                                request.getName(), protocolResult.isSuccess());
+                                ecsReq.getName(), protocolResult.isSuccess());
                         } catch (Exception e) {
                             logger.warn("Protocol execution failed: {}", e.getMessage());
                         }
                     }
                 }
                 
-                // Execute the scenario with JMeter DSL
-                List<TestResult> results = engine.executeScenario(scenario.getName(), scenario.getRequests());
+                // Execute the scenario with Gatling
+                // Process the requests using consistent io.ecs.model.Request objects
+                var requestList = scenario.getRequests();
+                List<io.ecs.model.Request> ecsRequests = convertToEcsRequests(requestList);
+                List<TestResult> results = engine.executeScenario(scenario.getName(), ecsRequests);
                 allResults.addAll(results);
                 
                 // Generate timestamp for report
@@ -513,14 +446,50 @@ public class JMeterDSLTest {
             
             // Log overall test statistics
             logger.info("All scenarios completed with {} total results", allResults.size());
+            
+        } catch (Exception e) {
+            logger.error("Error executing Gatling YAML test: {}", e.getMessage(), e);
+            throw e;
         } finally {
             // Clean up resources
             if (engine != null) {
                 engine.shutdown();
             }
-            logger.info("YAML config test completed successfully");
         }
         
         return allResults;
+    }
+    
+    /**
+     * Convert a generic config.Request to a specific model.Request
+     * 
+     * @param request The config.Request object
+     * @return A model.Request object
+     */
+    private static io.ecs.model.Request convertRequestToEcsRequest(io.ecs.config.Request request) {
+        io.ecs.model.Request ecsRequest = new io.ecs.model.Request();
+        ecsRequest.setName(request.getName());
+        ecsRequest.setMethod(request.getMethod());
+        ecsRequest.setEndpoint(request.getEndpoint());
+        ecsRequest.setProtocol(request.getProtocol());
+        ecsRequest.setBody(request.getBody());
+        ecsRequest.setHeaders(request.getHeaders());
+        ecsRequest.setParams(request.getParams());
+        ecsRequest.setVariables(request.getVariables());
+        return ecsRequest;
+    }
+    
+    /**
+     * Convert a list of config.Request objects to model.Request objects
+     * 
+     * @param requests List of config.Request objects
+     * @return List of model.Request objects
+     */
+    private static List<io.ecs.model.Request> convertToEcsRequests(List<io.ecs.config.Request> requests) {
+        List<io.ecs.model.Request> ecsRequests = new ArrayList<>();
+        for (io.ecs.config.Request request : requests) {
+            ecsRequests.add(convertRequestToEcsRequest(request));
+        }
+        return ecsRequests;
     }
 }

@@ -11,12 +11,15 @@ import java.util.Map;
  * Represents a test scenario in the YAML configuration
  */
 public class Scenario {
+    private String id;
     private String name;
+    private String description;
     private int threads = 1;
     private int iterations = 1;
     private int rampUp = 0;
     private int hold = 0;
     private String engine;
+    private double successThreshold = 100.0;
     private Map<String, String> variables = new HashMap<>();
     private Map<String, String> dataFiles = new HashMap<>();
     private List<Request> requests = new ArrayList<>();
@@ -91,6 +94,42 @@ public class Scenario {
 
     public void setRequests(List<Request> requests) {
         this.requests = requests;
+    }
+    
+    public String getId() {
+        return id;
+    }
+    
+    public void setId(String id) {
+        this.id = id;
+    }
+    
+    public String getDescription() {
+        return description;
+    }
+    
+    public void setDescription(String description) {
+        this.description = description;
+    }
+    
+    public double getSuccessThreshold() {
+        return successThreshold;
+    }
+    
+    public void setSuccessThreshold(double successThreshold) {
+        this.successThreshold = successThreshold;
+    }
+    
+    /**
+     * Add a request to this scenario
+     * 
+     * @param request Request to add
+     */
+    public void addRequest(Request request) {
+        if (requests == null) {
+            requests = new ArrayList<>();
+        }
+        requests.add(request);
     }
 
     @Override

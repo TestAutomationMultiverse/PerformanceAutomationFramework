@@ -1,7 +1,7 @@
 package io.ecs.config;
 
 import io.ecs.model.ExecutionConfig;
-import io.ecs.model.Scenario;
+import io.ecs.config.Scenario;
 import io.ecs.engine.Protocol;
 
 import java.util.ArrayList;
@@ -71,6 +71,39 @@ public class TestConfiguration {
     
     public List<Scenario> getScenarios() {
         return scenarios;
+    }
+    
+    /**
+     * Get scenarios converted to model.Scenario objects
+     * 
+     * @return List of model.Scenario objects
+     */
+    public List<io.ecs.model.Scenario> getModelScenarios() {
+        List<io.ecs.model.Scenario> modelScenarios = new ArrayList<>();
+        
+        for (Scenario configScenario : scenarios) {
+            io.ecs.model.Scenario modelScenario = new io.ecs.model.Scenario();
+            
+            // Copy basic properties
+            modelScenario.setId(configScenario.getId());
+            modelScenario.setName(configScenario.getName());
+            modelScenario.setDescription(configScenario.getDescription());
+            modelScenario.setThreads(configScenario.getThreads());
+            modelScenario.setIterations(configScenario.getIterations());
+            modelScenario.setRampUp(configScenario.getRampUp());
+            modelScenario.setHold(configScenario.getHold());
+            modelScenario.setEngine(configScenario.getEngine());
+            modelScenario.setSuccessThreshold(configScenario.getSuccessThreshold());
+            
+            // Copy collections
+            modelScenario.setRequests(new ArrayList<>(configScenario.getRequests()));
+            modelScenario.setVariables(new HashMap<>(configScenario.getVariables()));
+            modelScenario.setDataFiles(new HashMap<>(configScenario.getDataFiles()));
+            
+            modelScenarios.add(modelScenario);
+        }
+        
+        return modelScenarios;
     }
     
     public void setScenarios(List<Scenario> scenarios) {

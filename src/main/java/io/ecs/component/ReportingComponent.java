@@ -4,6 +4,7 @@ import io.ecs.model.TestResult;
 import io.ecs.model.Scenario;
 import io.ecs.report.JtlReporter;
 import io.ecs.report.ReportGenerator;
+import io.ecs.util.EcsLogger;
 import io.ecs.util.JmeterJtlAdapter;
 
 import java.io.IOException;
@@ -13,8 +14,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * ECS Component for handling reporting functionality
@@ -23,7 +22,7 @@ import java.util.logging.Logger;
  * reporting operations that can be applied to test result entities.
  */
 public class ReportingComponent {
-    private static final Logger LOGGER = Logger.getLogger(ReportingComponent.class.getName());
+    private static final EcsLogger logger = EcsLogger.getLogger(ReportingComponent.class);
     
     private final String reportDirectory;
     private final ReportGenerator reportGenerator;
@@ -64,11 +63,15 @@ public class ReportingComponent {
         JtlReporter reporter = new JtlReporter();
         jtlReporters.put(scenario.getId(), reporter);
         
-        try {
-            reporter.initializeJtlFile(reportPath);
-            jtlAdapter.initializeJtlFile(scenario);
-        } catch (IOException e) {
-            LOGGER.log(Level.SEVERE, "Error initializing reporting for " + scenario.getName(), e);
+        reporter.initializeJtlFile(reportPath);
+        
+        // Initialize JTL adapter if it exists
+        if (jtlAdapter != null) {
+            try {
+                jtlAdapter.initializeJtlFile(scenario.getName());
+            } catch (Exception e) {
+                logger.error("Error initializing JTL adapter for {}", scenario.getName(), e);
+            }
         }
         
         return this;
@@ -91,12 +94,22 @@ public class ReportingComponent {
             
             // Generate HTML report
             String reportPath = getHtmlReportPath(testResult.getScenarioName());
-            reportGenerator.generateHtmlReport(testResult, reportPath);
-            generatedReports.add(reportPath);
+            
+            // Convert TestResult to a Map of metrics for the report generator
+            Map<String, Object> metrics = new HashMap<>();
+            metrics.put("scenarioName", testResult.getScenarioName());
+            metrics.put("success", testResult.isSuccess());
+            metrics.put("statusCode", testResult.getStatusCode());
+            metrics.put("responseTime", testResult.getResponseTime());
+            metrics.put("startTime", testResult.getStartTime());
+            metrics.put("endTime", testResult.getEndTime());
+            
+            String generatedPath = ReportGenerator.generateReport(testResult.getScenarioName(), metrics);
+            generatedReports.add(generatedPath);
             
             return reportPath;
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error generating report for " + testResult.getScenarioName(), e);
+            logger.error("Error generating report for {}", testResult.getScenarioName(), e);
             return null;
         }
     }
@@ -114,13 +127,37 @@ public class ReportingComponent {
         JtlReporter reporter = jtlReporters.get(scenarioId);
         if (reporter != null) {
             try {
-                reporter.recordSamples(testResult);
-                jtlAdapter.recordSamples(scenarioName, testResult);
+                // Convert TestResult to a sample for JtlReporter
+                Map<String, Object> sample = new HashMap<>();
+                sample.put("timeStamp", testResult.getStartTime());
+                sample.put("elapsed", testResult.getResponseTime());
+                sample.put("label", testResult.getTestName());
+                sample.put("responseCode", String.valueOf(testResult.getStatusCode()));
+                sample.put("responseMessage", testResult.isSuccess() ? "OK" : "Error");
+                sample.put("threadName", "Thread-1"); // Default thread name
+                sample.put("dataType", "text");
+                sample.put("success", testResult.isSuccess());
+                sample.put("failureMessage", testResult.getError() != null ? testResult.getError() : "");
+                sample.put("bytes", 0); // Default bytes
+                sample.put("sentBytes", 0); // Default sent bytes
+                sample.put("grpThreads", 1); // Default group threads
+                sample.put("allThreads", 1); // Default all threads
+                sample.put("URL", ""); // Default URL
+                sample.put("Latency", 0); // Default latency
+                sample.put("IdleTime", 0); // Default idle time
+                sample.put("Connect", 0); // Default connect time
+                
+                reporter.recordSample(scenarioId, sample);
+                
+                // Convert TestResult to List for JmeterJtlAdapter
+                List<TestResult> testResults = new ArrayList<>();
+                testResults.add(testResult);
+                jtlAdapter.recordSamples(scenarioName, testResults);
             } catch (Exception e) {
-                LOGGER.log(Level.SEVERE, "Error recording samples for " + scenarioName, e);
+                logger.error("Error recording samples for {}", scenarioName, e);
             }
         } else {
-            LOGGER.warning("No reporter found for scenario ID: " + scenarioId);
+            logger.warn("No reporter found for scenario ID: {}", scenarioId);
         }
         
         return this;

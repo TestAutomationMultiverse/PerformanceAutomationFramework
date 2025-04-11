@@ -23,6 +23,22 @@ public class DynamicVariableResolver {
     private static final String UUID_VAR = "uuid";
     
     /**
+     * Resolve variables in a string using a variables map
+     * 
+     * @param template the template with variables to resolve
+     * @param variables the variables to use for resolution
+     * @return the resolved string
+     */
+    public static String resolveVariables(String template, Map<String, String> variables) {
+        if (template == null || template.isEmpty() || variables == null || variables.isEmpty()) {
+            return template;
+        }
+        
+        Map<String, Object> dynamicContext = new HashMap<>();
+        return processTemplate(template, variables, dynamicContext);
+    }
+    
+    /**
      * Process a template with variable substitution
      * 
      * @param template the template to process

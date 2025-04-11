@@ -48,7 +48,7 @@ public class ProtocolFactory {
      * Create a new protocol instance
      * Currently only HTTP/HTTPS protocols are supported
      */
-    private static Protocol createProtocol(String protocolName) {
+    public static Protocol createProtocol(String protocolName) {
         switch (protocolName) {
             case "HTTP":
             case "HTTPS":

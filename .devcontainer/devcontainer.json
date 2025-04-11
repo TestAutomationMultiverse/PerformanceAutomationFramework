@@ -1,11 +1,9 @@
 {
     "name": "Performance Testing Framework",
-    "description": "Development environment for the Performance Testing Framework with Java 17, Node.js 20, Maven, JMeter, and advanced linting/code quality tools",
     "dockerFile": "Dockerfile",
-    "postCreateCommand": "bash .devcontainer/post-create.sh",
     "features": {
         "ghcr.io/devcontainers/features/java:1": {
-            "version": "17",
+            "version": "21",
             "installMaven": "true",
             "mavenVersion": "3.9.5"
         },
@@ -15,11 +13,6 @@
         },
         "ghcr.io/devcontainers/features/git:1": {
             "version": "latest"
-        },
-        "ghcr.io/devcontainers/features/docker-in-docker:2": {
-            "version": "latest",
-            "moby": true,
-            "dockerDashComposeVersion": "v2"
         }
     },
     "customizations": {
@@ -47,45 +40,16 @@
                 "editor.formatOnSave": true,
                 "files.autoSave": "afterDelay",
                 "terminal.integrated.defaultProfile.linux": "bash",
-                "java.format.settings.url": "https://raw.githubusercontent.com/google/styleguide/gh-pages/eclipse-java-google-style.xml",
-                "java.checkstyle.configuration": "${workspaceFolder}/config/checkstyle/checkstyle.xml",
-                "java.checkstyle.version": "10.12.3",
                 "editor.codeActionsOnSave": {
                     "source.organizeImports": "always",
                     "source.fixAll": "always"
-                },
-                "java.spotbugs.extraArgs": [
-                    "-effort:max",
-                    "-high"
-                ],
-                "spotbugs.runAtFullBuild": false
-                // "sonarlint.rules": {
-                //     "java:S106": {
-                //         "level": "on"
-                //     },
-                //     "java:S1192": {
-                //         "level": "on"
-                //     },
-                //     "java:S1214": {
-                //         "level": "on"
-                //     }
-                // }
+                }
             }
         }
     },
     "remoteUser": "vscode",
-    "forwardPorts": [
-        8080, // Web application server
-        9090, // Prometheus
-        3000, // Grafana
-        9270, // JMeter backend listener
-        5000 // HTML Report viewer
-    ],
     "hostRequirements": {
         "memory": "8gb",
         "cpus": 4
-    },
-    "runArgs": [
-        "--init"
-    ]
+    }
 }

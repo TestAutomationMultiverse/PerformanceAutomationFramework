@@ -3,12 +3,12 @@ package io.ecs;
 import io.ecs.config.TestConfiguration;
 import io.ecs.config.YamlConfig;
 import io.ecs.engine.JMDSLEngine;
-import io.ecs.ConfigComponent;
-import io.ecs.ProtocolComponent;
-import io.ecs.ReportingComponent;
-import io.ecs.RequestBuilder;
-import io.ecs.ScenarioBuilder;
-import io.ecs.TestExecutionSystem;
+import io.ecs.component.ConfigComponent;
+import io.ecs.component.ProtocolComponent;
+import io.ecs.component.ReportingComponent;
+import io.ecs.model.RequestBuilder;
+import io.ecs.model.ScenarioBuilder;
+import io.ecs.system.TestExecutionSystem;
 import io.ecs.model.ExecutionConfig;
 import io.ecs.model.TestResult;
 import io.ecs.protocols.HttpProtocol;
@@ -68,7 +68,46 @@ import java.util.Map;
  */
 public class JMeterDSLTest {
     
-    private static final Logger logger = LoggerFactory.getLogger(JMeterDSLTest.class);
+    private static final Logger rawLogger = LoggerFactory.getLogger(JMeterDSLTest.class);
+    
+    // Custom logger wrapper to format messages with [INFO] | prefix
+    private static class CustomLogger {
+        private final Logger logger;
+        
+        public CustomLogger(Logger logger) {
+            this.logger = logger;
+        }
+        
+        public void info(String message) {
+            logger.info("[INFO]  | {}", message);
+        }
+        
+        public void warn(String message) {
+            logger.warn("[WARN]  | {}", message);
+        }
+        
+        public void error(String message) {
+            logger.error("[ERROR] | {}", message);
+        }
+        
+        public void info(String message, Object arg) {
+            logger.info("[INFO]  | " + message, arg);
+        }
+        
+        public void warn(String message, Object arg) {
+            logger.warn("[WARN]  | " + message, arg);
+        }
+        
+        public void error(String message, Object arg) {
+            logger.error("[ERROR] | " + message, arg);
+        }
+        
+        public void error(String message, Object arg1, Object arg2) {
+            logger.error("[ERROR] | " + message, arg1, arg2);
+        }
+    }
+    
+    private static final CustomLogger logger = new CustomLogger(rawLogger);
     private static final String DEFAULT_CONFIG_FILE = "src/test/resources/configs/sample_config.yaml";
     
     /**
@@ -235,14 +274,31 @@ public class JMeterDSLTest {
         request.setEndpoint("${baseUrl}/users/${userId}");
         scenario.addRequest(request);
         
+        // Create a config.Scenario from the model.Scenario
+        io.ecs.config.Scenario configScenario = new io.ecs.config.Scenario();
+        configScenario.setId(scenario.getId());
+        configScenario.setName(scenario.getName());
+        configScenario.setDescription(scenario.getDescription());
+        configScenario.setThreads(scenario.getThreads());
+        configScenario.setIterations(scenario.getIterations());
+        configScenario.setRampUp(scenario.getRampUp());
+        configScenario.setHold(scenario.getHold());
+        configScenario.setEngine(scenario.getEngine());
+        configScenario.setSuccessThreshold(scenario.getSuccessThreshold());
+        configScenario.setRequests(new ArrayList<>(scenario.getRequests()));
+        configScenario.setVariables(new HashMap<>(scenario.getVariables()));
+        if (scenario.getDataFiles() != null) {
+            configScenario.setDataFiles(new HashMap<>(scenario.getDataFiles()));
+        }
+        
         // Add scenario to component
-        configComponent.addScenario(scenario);
+        configComponent.addScenario(configScenario);
         
         // Use TestExecutionSystem to run the test
         TestExecutionSystem system = new TestExecutionSystem(reportDir);
         // Set the global variables on the system
         system.setGlobalVariables(testVariables);
-        Map<String, Object> results = system.executeScenario(scenario);
+        Map<String, Object> results = system.executeScenario(configScenario);
         
         // Verify results
         assertNotNull(results, "Results should not be null");

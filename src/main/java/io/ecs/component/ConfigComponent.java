@@ -1,10 +1,11 @@
 package io.ecs.component;
 
-import io.ecs.model.Scenario;
+import io.ecs.config.Scenario;
 import io.ecs.model.Request;
 import io.ecs.model.ExecutionConfig;
 import io.ecs.config.YamlConfig;
 import io.ecs.model.Response;
+import io.ecs.util.EcsLogger;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -12,8 +13,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * ECS Component for handling test configuration loading and management
@@ -22,7 +21,7 @@ import java.util.logging.Logger;
  * configuration capabilities that can be applied to scenario entities.
  */
 public class ConfigComponent {
-    private static final Logger LOGGER = Logger.getLogger(ConfigComponent.class.getName());
+    private static final EcsLogger logger = EcsLogger.getLogger(ConfigComponent.class);
     
     private final Map<String, String> globalVariables;
     private final List<Scenario> loadedScenarios;
@@ -56,7 +55,7 @@ public class ConfigComponent {
      * @throws IOException If the file cannot be read
      */
     public ConfigComponent loadConfig(String configFile) throws IOException {
-        LOGGER.info("Loading configuration from: " + configFile);
+        logger.info("Loading configuration from: {}", configFile);
         List<Scenario> scenarios = loadScenariosFromYaml(configFile, globalVariables);
         loadedScenarios.clear();
         loadedScenarios.addAll(scenarios);
@@ -72,7 +71,7 @@ public class ConfigComponent {
      * @throws IOException If the file cannot be read
      */
     public List<Scenario> loadScenariosFromYaml(String configFile, Map<String, String> variables) throws IOException {
-        LOGGER.info("Loading scenarios from YAML: " + configFile);
+        logger.info("Loading scenarios from YAML: {}", configFile);
         
         try {
             // Parse the YAML configuration
@@ -166,7 +165,7 @@ public class ConfigComponent {
             
             return scenarios;
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error loading scenarios from YAML: " + e.getMessage(), e);
+            logger.error("Error loading scenarios from YAML: {}", e.getMessage(), e);
             throw new IOException("Error parsing YAML configuration: " + e.getMessage(), e);
         }
     }
@@ -269,7 +268,19 @@ public class ConfigComponent {
         
         Request request = new Request();
         request.setName(name);
-        request.setUrl(url);
+        // Parse URL to determine protocol and endpoint
+        if (url != null) {
+            if (url.startsWith("https://")) {
+                request.setProtocol("HTTPS");
+                request.setEndpoint(url.substring(8)); // Remove https://
+            } else if (url.startsWith("http://")) {
+                request.setProtocol("HTTP");
+                request.setEndpoint(url.substring(7)); // Remove http://
+            } else {
+                request.setProtocol("HTTP"); // Default protocol
+                request.setEndpoint(url);
+            }
+        }
         request.setMethod(method);
         
         // Add headers if present
@@ -383,6 +394,48 @@ public class ConfigComponent {
      */
     public List<Scenario> getScenarios() {
         return new ArrayList<>(loadedScenarios);
+    }
+    
+    /**
+     * Convert between config.Scenario and model.Scenario
+     * 
+     * @param configScenario The source scenario from config package
+     * @return A new model.Scenario with the same properties
+     */
+    public io.ecs.model.Scenario convertToModelScenario(io.ecs.config.Scenario configScenario) {
+        io.ecs.model.Scenario modelScenario = new io.ecs.model.Scenario();
+        
+        // Copy basic properties
+        modelScenario.setId(configScenario.getId());
+        modelScenario.setName(configScenario.getName());
+        modelScenario.setDescription(configScenario.getDescription());
+        modelScenario.setThreads(configScenario.getThreads());
+        modelScenario.setIterations(configScenario.getIterations());
+        modelScenario.setRampUp(configScenario.getRampUp());
+        modelScenario.setHold(configScenario.getHold());
+        modelScenario.setEngine(configScenario.getEngine());
+        modelScenario.setSuccessThreshold(configScenario.getSuccessThreshold());
+        
+        // Copy collections
+        modelScenario.setRequests(new ArrayList<>(configScenario.getRequests()));
+        modelScenario.setVariables(new HashMap<>(configScenario.getVariables()));
+        modelScenario.setDataFiles(new HashMap<>(configScenario.getDataFiles()));
+        
+        return modelScenario;
+    }
+    
+    /**
+     * Convert a list of config.Scenario objects to model.Scenario objects
+     * 
+     * @param configScenarios List of config.Scenario objects
+     * @return List of model.Scenario objects
+     */
+    public List<io.ecs.model.Scenario> convertToModelScenarios(List<io.ecs.config.Scenario> configScenarios) {
+        List<io.ecs.model.Scenario> modelScenarios = new ArrayList<>();
+        for (io.ecs.config.Scenario configScenario : configScenarios) {
+            modelScenarios.add(convertToModelScenario(configScenario));
+        }
+        return modelScenarios;
     }
     
     /**

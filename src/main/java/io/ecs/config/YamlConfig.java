@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.ecs.model.ExecutionConfig;
 import io.ecs.model.Request;
-import io.ecs.model.Scenario;
+import io.ecs.config.Scenario;
 import io.ecs.engine.ProtocolFactory;
 import io.ecs.util.FileUtils;
 
