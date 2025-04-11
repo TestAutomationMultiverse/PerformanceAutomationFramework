@@ -1,13 +1,14 @@
-# Java Performance Testing Framework - Comprehensive Guide
+# Generic Performance Framework - Comprehensive Guide
 
-This guide provides a complete introduction to using the Java Performance Testing Framework for executing performance tests.
+This guide provides a complete introduction to using the Generic Performance Framework for executing performance tests.
 
 ## Table of Contents
 
 1. [Introduction](#introduction)
-2. [Prerequisites](#prerequisites)
-3. [Installation](#installation)
-4. [Quick Start](#quick-start)
+2. [Project Structure](#project-structure)
+3. [Prerequisites](#prerequisites)
+4. [Installation](#installation)
+5. [Quick Start](#quick-start)
    - [Method 1: Using JMeter DSL Test](#method-1-using-jmeter-dsl-test)
    - [Method 2: Using YAML Configuration](#method-2-using-yaml-configuration)
    - [Method 3: Using JMeter TreeBuilder Test](#method-3-using-jmeter-treebuilder-test)
@@ -15,6 +16,7 @@ This guide provides a complete introduction to using the Java Performance Testin
    - [YAML Configuration Structure](#yaml-configuration-structure)
    - [Variable Substitution](#variable-substitution)
    - [Request Configuration](#request-configuration)
+   - [Path Resolution System](#path-resolution-system)
 6. [Programmatic API Guide](#programmatic-api-guide)
    - [Basic Test Setup](#basic-test-setup)
    - [Advanced Configuration](#advanced-configuration)
@@ -33,7 +35,7 @@ This guide provides a complete introduction to using the Java Performance Testin
 
 ## Introduction
 
-The Java Performance Testing Framework is a versatile tool for performance testing REST APIs and web services. It features:
+The Generic Performance Framework is a versatile tool for performance testing REST APIs and web services. It features:
 
 - Simple JMeter DSL-based test creation
 - YAML configuration for non-programmers
@@ -42,6 +44,52 @@ The Java Performance Testing Framework is a versatile tool for performance testi
 - Advanced metrics collection and analysis
 - Support for various testing protocols (HTTP, HTTPS, JDBC, etc.)
 - Alternative JMeter TreeBuilder implementation for native JMeter integration
+
+## Project Structure
+
+The Generic Performance Framework uses a multi-module Maven structure:
+
+### Module Organization
+
+```
+generic-performance-framework/          # Parent project
+├── generic-performance-framework-core/  # Core library module
+│   ├── src/main/java/                   # Core framework code
+│   ├── src/test/java/                   # Unit tests for core
+│   └── pom.xml                          # Core module POM
+├── generic-performance-framework-tests/ # Test examples module
+│   ├── src/test/java/                   # Test examples
+│   ├── src/test/resources/              # Test resources
+│   │   ├── configs/                     # YAML configuration files
+│   │   ├── data/                        # CSV test data
+│   │   ├── templates/                   # Request templates
+│   │   └── jmeter-props/                # JMeter properties
+│   └── pom.xml                          # Tests module POM
+└── pom.xml                             # Parent POM file
+```
+
+### Module Responsibilities
+
+- **generic-performance-framework-core**:
+  - Contains all framework core functionality
+  - Designed to be used as a dependency in other projects
+  - Published to GitHub Packages for easy consumption
+  - Includes all engine implementations, protocol support, and reporting
+
+- **generic-performance-framework-tests**:
+  - Contains example tests and configurations
+  - Demonstrates different testing approaches
+  - Uses the core module as a dependency
+  - Includes test resources and templates
+
+### Maven Configuration
+
+The Maven configuration follows best practices for multi-module projects:
+
+- The parent POM defines common properties, dependencies, and plugin management
+- Each module has its own POM file with specific configurations
+- Dependencies are managed at the parent level for consistent versioning
+- The core module includes source and javadoc JAR generation for publishing
 
 ## Prerequisites
 
@@ -55,8 +103,8 @@ Before starting, ensure you have:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/java-performance-framework.git
-cd java-performance-framework
+git clone https://github.com/TestAutomationMultiverse/GenericPerformanceFramework.git
+cd GenericPerformanceFramework
 ```
 
 2. Build the project:
@@ -73,13 +121,13 @@ The framework provides multiple ways to run tests:
 The simplest way to start is by running the pre-configured JMeter DSL test:
 
 ```bash
-mvn exec:java -Dexec.mainClass="io.perftest.MainRunner" -Dexec.args="dsl"
+mvn exec:java -Dexec.mainClass="io.ecs.system.MainRunner" -Dexec.args="dsl"
 ```
 
 Or use the specific test class:
 
 ```bash
-mvn exec:java -Dexec.mainClass="io.perftest.JMeterDSLTest"
+mvn exec:java -Dexec.mainClass="io.ecs.JMeterDSLTest"
 ```
 
 This will:
@@ -93,7 +141,7 @@ This will:
 For a more declarative approach, run tests using a YAML configuration file:
 
 ```bash
-mvn exec:java -Dexec.mainClass="io.perftest.MainRunner" -Dexec.args="yaml src/main/resources/configs/sample_config.yaml"
+mvn exec:java -Dexec.mainClass="io.ecs.system.MainRunner" -Dexec.args="yaml src/main/resources/configs/sample_config.yaml"
 ```
 
 This approach is excellent for non-developers or for defining test configurations outside of code.
@@ -103,13 +151,13 @@ This approach is excellent for non-developers or for defining test configuration
 For native JMeter-like implementation using the standard JMeter API rather than the DSL:
 
 ```bash
-mvn exec:java -Dexec.mainClass="io.perftest.MainRunner" -Dexec.args="treebuilder"
+mvn exec:java -Dexec.mainClass="io.ecs.system.MainRunner" -Dexec.args="treebuilder"
 ```
 
 Or run the specific test class:
 
 ```bash
-mvn exec:java -Dexec.mainClass="io.perftest.JMeterTreeBuilderTest"
+mvn exec:java -Dexec.mainClass="io.ecs.JMeterTreeBuilderTest"
 ```
 
 This experimental implementation uses the standard JMeter API directly for a more traditional approach.
@@ -204,6 +252,69 @@ Each request can have the following properties:
 - **validation**: Response validation criteria (optional)
 - **extractions**: Data to extract from responses (optional)
 
+### Path Resolution System
+
+The framework includes a sophisticated path resolution system that allows you to reference templates and resource files using simplified paths in your YAML configurations.
+
+#### Simplified Path References
+
+Instead of specifying full paths to template files:
+
+```yaml
+requests:
+  - name: Create User
+    method: POST
+    endpoint: ${baseUrl}/users
+    headers: src/test/resources/templates/http/headers/default_headers.json
+    body: src/test/resources/templates/http/body/create_user_body.json
+    params: src/test/resources/templates/http/params/user_params.template
+```
+
+You can use just the filename:
+
+```yaml
+requests:
+  - name: Create User
+    method: POST
+    endpoint: ${baseUrl}/users
+    headers: default_headers.json
+    body: create_user_body.json
+    params: user_params.template
+```
+
+#### How Path Resolution Works
+
+The framework uses several strategies to locate the correct file:
+
+1. **Check if the full path exists**: If the provided path exists as-is, it's used directly
+2. **Extension-based resolution**: Files are searched in appropriate directories based on their extension
+3. **Name-based resolution**: Files with "header" in the name are checked in the headers directory, etc.
+4. **Fallback mechanism**: If the exact location can't be determined, all potential directories are searched
+
+#### Supported File Types
+
+The path resolution system automatically resolves:
+
+- **Header Templates**: JSON files with header definitions (`.json`)
+- **Body Templates**: JSON files with request body templates (`.json`)
+- **Parameter Templates**: Template files for query parameters (`.template`)
+- **Schema Files**: JSON Schema files for response validation (`.schema.json`)
+- **Data Files**: CSV files for data-driven testing (`.csv`)
+
+#### File Naming Conventions
+
+For optimal resolution, follow these naming conventions:
+
+- Header files: Include "header" in the name (e.g., `default_headers.json`, `auth_header.json`)
+- Body files: Include "body" in the name (e.g., `create_user_body.json`, `update_body.json`)
+- Schema files: Include "schema" in the name (e.g., `user_schema.json`, `error.schema.json`)
+- Parameter files: Use `.template` extension (e.g., `search_params.template`)
+- Data files: Use `.csv` extension (e.g., `users.csv`, `test_data.csv`)
+
+#### Implementation
+
+The path resolution system is implemented in the `FileUtils` class, which handles all file operations in the framework. The key method is `resolveFilePath(String filePath)`, which converts simplified paths to full paths. This functionality is automatically used by the framework when loading template files and data sources from YAML configurations.
+
 ## Programmatic API Guide
 
 ### Basic Test Setup
@@ -211,9 +322,9 @@ Each request can have the following properties:
 Here's how to create a basic test using the programmatic API:
 
 ```java
-import io.perftest.engine.JMDSLEngine;
-import io.perftest.model.ExecutionConfig;
-import io.perftest.model.TestResult;
+import io.ecs.engine.JMDSLEngine;
+import io.ecs.model.ExecutionConfig;
+import io.ecs.model.TestResult;
 
 import java.util.HashMap;
 import java.util.List;
@@ -453,8 +564,8 @@ If tests run slow:
 
 The framework has been consolidated to focus on HTTP/HTTPS protocol implementation for simplicity and maintainability:
 
-1. The unified `Protocol` interface is in the `io.perftest.engine` package
-2. The primary implementation is `HttpProtocol` in the `io.perftest.protocols` package
+1. The unified `Protocol` interface is in the `io.ecs.engine` package
+2. The primary implementation is `HttpProtocol` in the `io.ecs.protocols` package
 3. All HTTP and HTTPS requests are handled by this single implementation
 
 #### Key Features of the HTTP Protocol Implementation
@@ -524,8 +635,8 @@ scenarios:
 For direct JMeter API integration, use the TreeBuilder engine:
 
 ```java
-import io.perftest.engine.JMTreeBuilderEngine;
-import io.perftest.model.ExecutionConfig;
+import io.ecs.engine.JMTreeBuilderEngine;
+import io.ecs.model.ExecutionConfig;
 
 // Create execution configuration
 ExecutionConfig config = new ExecutionConfig();

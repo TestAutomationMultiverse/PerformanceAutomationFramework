@@ -8,10 +8,11 @@ This guide provides a quick introduction to using the Java Performance Testing F
 2. [Installation](#installation)
 3. [Running Your First Test](#running-your-first-test)
 4. [Creating Custom Tests](#creating-custom-tests)
-5. [Using CSV Data Sources](#using-csv-data-sources)
-6. [Analyzing Test Results](#analyzing-test-results)
-7. [Troubleshooting](#troubleshooting)
-8. [Next Steps](#next-steps)
+5. [Using Simplified Path References](#using-simplified-path-references)
+6. [Using CSV Data Sources](#using-csv-data-sources)
+7. [Analyzing Test Results](#analyzing-test-results)
+8. [Troubleshooting](#troubleshooting)
+9. [Next Steps](#next-steps)
 
 ## Prerequisites
 
@@ -103,6 +104,43 @@ Then run it:
 ```bash
 mvn exec:java -Dexec.mainClass="io.perftest.App" -Dexec.args="path/to/test_config.yaml"
 ```
+
+## Using Simplified Path References
+
+The framework supports simplified path references in your YAML configurations. Instead of specifying full paths to template files, you can use just the filename.
+
+### Examples
+
+**Old approach (full paths):**
+```yaml
+requests:
+  - name: Create User
+    method: POST
+    endpoint: ${baseUrl}/users
+    headers: src/test/resources/templates/http/headers/default_headers.json
+    body: src/test/resources/templates/http/body/create_user_body.json
+```
+
+**New approach (simplified paths):**
+```yaml
+requests:
+  - name: Create User
+    method: POST
+    endpoint: ${baseUrl}/users
+    headers: default_headers.json
+    body: create_user_body.json
+```
+
+### Supported File Types
+
+The framework automatically resolves paths for:
+- Header templates (`.json`)
+- Body templates (`.json`)
+- Parameter templates (`.template`)
+- Schema validation files (`.schema.json`)
+- CSV data files (`.csv`)
+
+The framework intelligently determines the appropriate directory based on file naming and extension.
 
 ### Option 2: Create a Custom Java Test Class
 

@@ -1,24 +1,144 @@
-name: GitHub Pages
+name: Core Module Documentation
 
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'generic-performance-framework-core/**'
+      - 'docs/**'
+      - 'README.md'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build-and-deploy-docs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     
-    - name: Generate GitHub Pages from README
+    - name: Set up JDK 21
+      uses: actions/setup-java@v3
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+    
+    - name: Generate Javadoc for Core Module
       run: |
-        mkdir -p docs
+        mvn javadoc:javadoc --file generic-performance-framework-core/pom.xml
+        mkdir -p docs/javadoc
+        cp -r generic-performance-framework-core/target/site/apidocs/* docs/javadoc/
+    
+    - name: Generate GitHub Pages Content
+      run: |
+        mkdir -p docs/core
+        
+        # Copy main README as index
         cp README.md docs/index.md
+        
+        # Copy core module documentation
+        cp -r docs/* docs/core/ 2>/dev/null || true
+        
+        # Get core module version
+        CORE_VERSION=$(mvn -q -DforceStdout -f generic-performance-framework-core/pom.xml help:evaluate -Dexpression=project.version)
+        
+        # Create Maven usage guide
+        cat > docs/usage.md << 'USAGE'
+        # Using Generic Performance Framework Core
+        
+        This guide explains how to use the core module of the Generic Performance Framework in your projects.
+        
+        ## Maven Dependency
+        
+        Add this to your pom.xml:
+        
+        ```xml
+        <dependency>
+          <groupId>io.ecs</groupId>
+          <artifactId>generic-performance-framework-core</artifactId>
+          <version>${CORE_VERSION}</version>
+        </dependency>
+        ```
+        
+        ### Repository Configuration
+        
+        You need to add the GitHub Packages repository to your Maven settings:
+        
+        ```xml
+        <repositories>
+          <repository>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/TestAutomationMultiverse/GenericPerformanceFramework</url>
+          </repository>
+        </repositories>
+        ```
+        
+        ## Basic Usage
+        
+        The framework provides a unified interface for performance testing using different engines like JMeter and Gatling.
+        
+        ```java
+        import io.ecs.config.TestConfiguration;
+        import io.ecs.config.YamlConfig;
+        import io.ecs.core.PerformanceTest;
+        import io.ecs.engine.EngineFactory;
+        import io.ecs.model.TestResult;
+        
+        public class QuickStart {
+            public static void main(String[] args) {
+                // Load test configuration from YAML
+                TestConfiguration config = YamlConfig.fromFile("config.yaml");
+                
+                // Create and run the test
+                PerformanceTest test = new PerformanceTest(config, EngineFactory.createEngine(config));
+                TestResult result = test.execute();
+                
+                // Process results
+                System.out.println("Test duration: " + result.getDuration() + "ms");
+                System.out.println("Success rate: " + result.getSuccessRate() + "%");
+            }
+        }
+        ```
+        
+        See the Javadoc for detailed API documentation.
+        USAGE
+        
+        # Create a navigation file
+        cat > docs/_layouts/default.html << 'LAYOUT'
+        <!DOCTYPE html>
+        <html lang="{{ site.lang | default: "en-US" }}">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="theme-color" content="#157878">
+            <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+          </head>
+          <body>
+            <header class="page-header">
+              <h1 class="project-name">{{ site.title | default: site.github.repository_name }}</h1>
+              <h2 class="project-tagline">{{ site.description | default: site.github.project_tagline }}</h2>
+              <a href="/" class="btn">Home</a>
+              <a href="/usage.html" class="btn">Usage Guide</a>
+              <a href="/javadoc/" class="btn">API Documentation</a>
+              <a href="{{ site.github.repository_url }}" class="btn">View on GitHub</a>
+            </header>
+            <main class="main-content">
+              {{ content }}
+              <footer class="site-footer">
+                <span class="site-footer-owner">Generic Performance Framework is maintained by <a href="{{ site.github.owner_url }}">{{ site.github.owner_name }}</a>.</span>
+              </footer>
+            </main>
+          </body>
+        </html>
+        LAYOUT
+        
+        # Create config file with updated metadata
         cat > docs/_config.yml << 'CONFIG'
         theme: jekyll-theme-cayman
-        title: Performance Automation Framework
-        description: A Java-based Performance Testing Framework with JMeter DSL
+        title: Generic Performance Framework
+        description: A comprehensive Java-based framework for performance testing with JMeter and Gatling
+        github:
+          repository_url: https://github.com/TestAutomationMultiverse/GenericPerformanceFramework
         CONFIG
         
     - name: Deploy to GitHub Pages

@@ -10,7 +10,8 @@ This document provides a complete reference for the YAML configuration format us
 4. [Scenarios](#scenarios)
 5. [Requests](#requests)
 6. [Data-Driven Testing](#data-driven-testing)
-7. [Complete Example](#complete-example)
+7. [Path Resolution](#path-resolution)
+8. [Complete Example](#complete-example)
 
 ## Basic Structure
 
@@ -198,6 +199,54 @@ requests:
 ```
 
 During execution, the test will iterate through each row in the CSV file, substituting variables accordingly.
+
+## Path Resolution
+
+The framework supports simplified path references in your YAML configurations. Instead of specifying full paths to template files, you can use just the filename, and the framework will automatically resolve the correct path.
+
+### Supported File Types
+
+The framework can automatically resolve paths for:
+
+- Header template files (`.json`)
+- Body template files (`.json`)
+- Parameter template files (`.template`)
+- Schema validation files (`.schema.json`)
+- CSV data files (`.csv`)
+
+### Examples
+
+Instead of writing:
+
+```yaml
+# Full path approach
+body: src/test/resources/templates/http/body/create_user_body.json
+headers: src/test/resources/templates/http/headers/default_headers.json
+params: src/test/resources/templates/http/params/create_user_params.template
+```
+
+You can simply use:
+
+```yaml
+# Simplified path approach
+body: create_user_body.json
+headers: default_headers.json
+params: create_user_params.template
+```
+
+### How It Works
+
+The framework resolves paths based on:
+
+1. **File Extension**: `.json` files are checked in templates/http/headers, templates/http/body, and templates/http/schema directories
+2. **File Naming**: Files with "header" in the name are resolved to the headers directory, "body" to the body directory, etc.
+3. **Fallback Mechanism**: If the framework can't determine the exact location, it will search in all potential template directories
+
+### Benefits
+
+- **Simplicity**: No need to memorize and type out full directory paths
+- **Maintainability**: Changing the location of template directories only requires updating the framework, not all YAML files
+- **Readability**: Configuration files become more concise and easier to understand
 
 ## Complete Example
 

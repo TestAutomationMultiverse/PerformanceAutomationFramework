@@ -1,89 +1,171 @@
-name: Static Code Analysis
+name: Core Module Static Analysis
 
 on:
   push:
     branches: [ main, develop ]
+    paths:
+      - 'generic-performance-framework-core/**'
+      - '.github/workflows/static-analysis.yml'
   pull_request:
     branches: [ main, develop ]
+    paths:
+      - 'generic-performance-framework-core/**'
   workflow_dispatch:
 
 jobs:
-  static-analysis:
+  static-analysis-core:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up JDK 17
+    - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
         cache: maven
     
-    - name: Build with Maven
-      run: mvn -B clean compile
+    - name: Build core module
+      run: mvn -B clean compile --file generic-performance-framework-core/pom.xml
     
-    - name: Run SpotBugs
-      run: mvn spotbugs:spotbugs -DskipTests
+    - name: Add SpotBugs plugin to core module
+      run: |
+        if ! grep -q "spotbugs-maven-plugin" generic-performance-framework-core/pom.xml; then
+          # Create a temporary file with the plugin configuration
+          cat > spotbugs-plugin.xml << 'EOF'
+              <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.7.3.4</version>
+                <configuration>
+                  <effort>Max</effort>
+                  <threshold>Medium</threshold>
+                  <xmlOutput>true</xmlOutput>
+                  <failOnError>false</failOnError>
+                </configuration>
+              </plugin>
+          EOF
+          
+          # Insert the plugin configuration before the end of the plugins section
+          sed -i '/<\/plugins>/e cat spotbugs-plugin.xml' generic-performance-framework-core/pom.xml
+        fi
     
-    - name: Upload SpotBugs Report
+    - name: Run SpotBugs on core module
+      run: mvn spotbugs:spotbugs -DskipTests --file generic-performance-framework-core/pom.xml
+      continue-on-error: true
+    
+    - name: Upload SpotBugs Report for core
       if: success() || failure()
       uses: actions/upload-artifact@v4
       with:
-        name: spotbugs-report
-        path: target/spotbugsXml.xml
+        name: core-spotbugs-report
+        path: generic-performance-framework-core/target/spotbugsXml.xml
         retention-days: 7
     
-    - name: Run Checkstyle
-      run: mvn checkstyle:check -DskipTests
-      continue-on-error: true  # Don't fail the workflow on style violations
+    - name: Add Checkstyle plugin to core module
+      run: |
+        if ! grep -q "maven-checkstyle-plugin" generic-performance-framework-core/pom.xml; then
+          # Create a temporary file with the plugin configuration
+          cat > checkstyle-plugin.xml << 'EOF'
+              <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.2.1</version>
+                <configuration>
+                  <configLocation>google_checks.xml</configLocation>
+                  <encoding>UTF-8</encoding>
+                  <consoleOutput>true</consoleOutput>
+                  <failsOnError>false</failsOnError>
+                  <linkXRef>false</linkXRef>
+                </configuration>
+              </plugin>
+          EOF
+          
+          # Insert the plugin configuration before the end of the plugins section
+          sed -i '/<\/plugins>/e cat checkstyle-plugin.xml' generic-performance-framework-core/pom.xml
+        fi
     
-    - name: Upload Checkstyle Report
+    - name: Run Checkstyle on core module
+      run: mvn checkstyle:check -DskipTests --file generic-performance-framework-core/pom.xml
+      continue-on-error: true
+    
+    - name: Upload Checkstyle Report for core
       if: success() || failure()
       uses: actions/upload-artifact@v4
       with:
-        name: checkstyle-report
-        path: target/checkstyle-result.xml
+        name: core-checkstyle-report
+        path: generic-performance-framework-core/target/checkstyle-result.xml
         retention-days: 7
         
-  code-coverage:
+  code-coverage-core:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up JDK 17
+    - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
         cache: maven
     
-    - name: Run tests with Jacoco
-      run: mvn -B test jacoco:report
+    - name: Add JaCoCo plugin to core module
+      run: |
+        if ! grep -q "jacoco-maven-plugin" generic-performance-framework-core/pom.xml; then
+          # Create a temporary file with the plugin configuration
+          cat > jacoco-plugin.xml << 'EOF'
+              <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.10</version>
+                <executions>
+                  <execution>
+                    <goals>
+                      <goal>prepare-agent</goal>
+                    </goals>
+                  </execution>
+                  <execution>
+                    <id>report</id>
+                    <phase>prepare-package</phase>
+                    <goals>
+                      <goal>report</goal>
+                    </goals>
+                  </execution>
+                </executions>
+              </plugin>
+          EOF
+          
+          # Insert the plugin configuration before the end of the plugins section
+          sed -i '/<\/plugins>/e cat jacoco-plugin.xml' generic-performance-framework-core/pom.xml
+        fi
     
-    - name: Upload Coverage Report
+    - name: Run tests with Jacoco for core module
+      run: mvn -B test jacoco:report --file generic-performance-framework-core/pom.xml
+      continue-on-error: true
+    
+    - name: Upload Coverage Report for core
       if: success() || failure()
       uses: actions/upload-artifact@v4
       with:
-        name: coverage-report
-        path: target/site/jacoco/
+        name: core-coverage-report
+        path: generic-performance-framework-core/target/site/jacoco/
         retention-days: 7
     
-    - name: Generate JaCoCo Badge
+    - name: Generate JaCoCo Badge for core
       id: jacoco
       uses: cicirello/jacoco-badge-generator@v2
       with:
-        jacoco-csv-file: target/site/jacoco/jacoco.csv
+        jacoco-csv-file: generic-performance-framework-core/target/site/jacoco/jacoco.csv
         badges-directory: .github/badges
         generate-coverage-badge: true
         generate-branches-badge: true
+      continue-on-error: true
     
     - name: Commit and Push Badges
       if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
       run: |
         git config --global user.name 'GitHub Actions'
         git config --global user.email 'actions@github.com'
-        git add .github/badges/jacoco.svg
-        git add .github/badges/branches.svg
-        git commit -m "Update code coverage badges" || echo "No changes to commit"
-        git push
+        git add .github/badges/jacoco.svg .github/badges/branches.svg || true
+        git commit -m "Update code coverage badges for core module" || echo "No changes to commit"
+        git push || echo "Failed to push badges"

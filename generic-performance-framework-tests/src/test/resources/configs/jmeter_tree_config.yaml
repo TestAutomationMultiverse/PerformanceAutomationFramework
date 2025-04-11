@@ -1,0 +1,110 @@
+# Enhanced Performance Test Configuration with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths with simplified paths for JMeter TreeBuilder with simplified paths
+protocol: http
+engine: JMTREE  # Using JMeter TreeBuilder engine
+data: sample_HTTP_API_Test.csv  # Simplified path
+
+# Global variables available to all scenarios and requests
+variables:
+  baseUrl: https://jsonplaceholder.typicode.com
+  timeout: 30000
+  contentType: application/json
+  version: 1.0.0
+  # Simplified path reference
+  defaultHeaders: default_headers.json
+
+# Execution configuration
+execution:
+  threads: 5
+  iterations: 10
+  rampUpSeconds: 2
+  holdSeconds: 5
+  duration: 60  # Maximum test duration in seconds
+  successThreshold: 80.0  # Percentage of successful requests required for test to pass (default: 100%)
+  
+  # Execution-specific variables
+  variables:
+    connectionTimeout: 5000
+    socketTimeout: 30000
+    followRedirects: true
+
+# Test scenarios
+scenarios:
+  # HTTP API Test Scenario
+  - name: JMTree HTTP API Test
+    description: Testing HTTP endpoints with JMeter TreeBuilder using simplified file paths
+    # Scenario-specific variables
+    variables:
+      apiVersion: v1
+    
+    # Requests in this scenario
+    requests:
+      - name: "Create User"
+        protocol: http  # Override global protocol if needed
+        endpoint: "https://jsonplaceholder.typicode.com/users"
+        method: "POST"
+        # Simplified file paths - just use the filename
+        body: create_user_body.json
+        headers: create_user_headers.json
+        params: create_user_params.template
+        
+        # Request-specific variables
+        variables:
+          userId: ${iteration}  # Using the current iteration as userId for more realistic testing
+          userName: "User ${iteration}"  # Dynamic user name based on iteration
+        
+        # Simplified schema references
+        responses:
+          'Passed': create_user.schema.json
+          'Failed': genericError.schema.json
+
+      - name: "Get Users"
+        endpoint: "https://jsonplaceholder.typicode.com/users"
+        method: "GET"
+        # Simplified file paths
+        headers: create_user_headers.json
+        params: create_user_params.template
+        
+        # Simplified schema references
+        responses:
+          'Passed': create_user.schema.json
+          'Failed': genericError.schema.json
+  
+  # HTTPS API Test Scenario
+  - name: JMTree HTTPS API Test
+    description: Testing secure HTTPS endpoints with JMeter TreeBuilder
+    variables:
+      userId: 1
+    requests:
+      - name: "Get User Details"
+        protocol: https
+        endpoint: "https://jsonplaceholder.typicode.com/users/1"
+        method: "GET"
+        # Simplified schema reference
+        responses:
+          'Passed': create_user.schema.json
+          
+  # REST API Test Scenario
+  - name: REST API Test
+    description: Testing RESTful API endpoints using JMeter TreeBuilder
+    variables:
+      userId: 2
+      postId: 1
+    requests:
+      - name: "Get User"
+        endpoint: "https://jsonplaceholder.typicode.com/users/${userId}"
+        method: "GET"
+        headers:
+          Accept: "application/json"
+          User-Agent: "JMeter-TreeBuilder-Test"
+        
+      - name: "Get User Posts"
+        endpoint: "https://jsonplaceholder.typicode.com/users/${userId}/posts"
+        method: "GET"
+        headers:
+          Accept: "application/json"
+          
+      - name: "Get Post Comments"
+        endpoint: "https://jsonplaceholder.typicode.com/posts/${postId}/comments"
+        method: "GET"
+        headers:
+          Accept: "application/json"

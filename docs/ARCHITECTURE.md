@@ -7,6 +7,7 @@ This document provides an overview of the architecture and design principles of 
 - [Architectural Overview](#architectural-overview)
 - [Core Components](#core-components)
 - [Test Execution Flow](#test-execution-flow)
+- [Path Resolution System](#path-resolution-system)
 - [Extension Points](#extension-points)
 - [Design Decisions](#design-decisions)
 
@@ -150,6 +151,65 @@ Collects and processes performance metrics during test execution.
 5. **Engine Shutdown**
    - Release resources
    - Finalize reports
+
+## Path Resolution System
+
+The framework includes a sophisticated path resolution system that simplifies referencing templates and resource files in YAML configurations.
+
+### FileUtils.java
+
+The core of the path resolution system is the `FileUtils` class, which provides:
+
+1. **Intelligent Path Resolution**: Automatically converts simplified file references to full paths
+2. **Resource Type Detection**: Identifies the correct directory based on file extension and naming patterns
+3. **Fallback Mechanism**: Searches multiple directories if the exact location isn't immediately determined
+
+### Implementation Details
+
+```java
+public static String resolveFilePath(String filePath) {
+    // If it's already a full path that exists, return it
+    if (fileExists(filePath)) {
+        return filePath;
+    }
+    
+    // Extract filename
+    String fileName = new File(filePath).getName();
+    
+    // Check appropriate directories based on file type
+    if (fileName.endsWith(".json")) {
+        if (fileName.contains("header")) {
+            return checkPath(HEADERS_BASE_PATH + fileName);
+        } else if (fileName.contains("body")) {
+            return checkPath(BODIES_BASE_PATH + fileName);
+        } // etc.
+    }
+    
+    // Fallback: search in all potential directories
+    for (String basePath : BASE_PATHS) {
+        if (fileExists(basePath + fileName)) {
+            return basePath + fileName;
+        }
+    }
+    
+    // If not found, return original path
+    return filePath;
+}
+```
+
+### Integration
+
+The path resolution system is integrated into several key components:
+
+1. **Request Class**: All setter methods for file-based properties (headers, body, etc.) automatically resolve paths
+2. **TestConfiguration**: Data file references are resolved to their correct locations
+3. **Response Validators**: Schema file references are resolved automatically
+
+### Benefits
+
+- **Simplified Configuration**: Users can reference files by name without specifying full paths
+- **Maintainability**: Template directory structure can be changed without updating all configuration files
+- **Consistency**: All file references are handled uniformly throughout the framework
 
 ## Extension Points
 

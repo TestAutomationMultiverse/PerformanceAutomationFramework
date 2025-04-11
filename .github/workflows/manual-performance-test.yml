@@ -1,8 +1,17 @@
-name: Manual Performance Test
+name: Core Module Performance Test
 
 on:
   workflow_dispatch:
     inputs:
+      engine:
+        description: 'Performance engine to use'
+        required: true
+        default: 'jmeter'
+        type: choice
+        options:
+          - jmeter
+          - gatling
+          - hybrid
       protocol:
         description: 'Test protocol to run'
         required: true
@@ -13,9 +22,9 @@ on:
           - graphql
           - jdbc
           - soap
+          - mqtt
+          - jms
           - all
-          - html-demo
-          - full-demo
       threads:
         description: 'Number of threads'
         required: true
@@ -40,9 +49,10 @@ on:
         description: 'Target URL or endpoint (for HTTP/GraphQL/SOAP)'
         required: false
         type: string
-      custom_config:
-        description: 'Path to custom config file (relative to repo root)'
+      config_file:
+        description: 'Path to YAML config file (relative to generic-performance-framework-tests/src/test/resources/configs)'
         required: false
+        default: 'sample_config.yaml'
         type: string
       threshold_assertions:
         description: 'Enable performance threshold assertions'
@@ -66,26 +76,26 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up JDK 17
+    - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
         cache: maven
     
-    - name: Build and run tests
-      run: mvn -B clean package -DskipTests=false
+    - name: Build core and tests modules
+      run: mvn -B clean package -DskipTests
     
     - name: Set test parameters
       run: |
-        echo "PROTOCOL=${{ github.event.inputs.protocol }}" >> $GITHUB_ENV
+        echo "ENGINE=${{ github.event.inputs.engine }}" >> $GITHUB_ENV
         echo "PROTOCOL=${{ github.event.inputs.protocol }}" >> $GITHUB_ENV
         echo "THREADS=${{ github.event.inputs.threads }}" >> $GITHUB_ENV
         echo "RAMP_UP=${{ github.event.inputs.ramp_up_seconds }}" >> $GITHUB_ENV
         echo "DURATION=${{ github.event.inputs.duration_seconds }}" >> $GITHUB_ENV
         echo "ITERATIONS=${{ github.event.inputs.iterations }}" >> $GITHUB_ENV
         echo "TARGET_URL=${{ github.event.inputs.target_url }}" >> $GITHUB_ENV
-        echo "CUSTOM_CONFIG=${{ github.event.inputs.custom_config }}" >> $GITHUB_ENV
+        echo "CONFIG_FILE=${{ github.event.inputs.config_file }}" >> $GITHUB_ENV
         echo "THRESHOLD_ASSERTIONS=${{ github.event.inputs.threshold_assertions }}" >> $GITHUB_ENV
         
         # Extract repository info for report links
@@ -96,36 +106,138 @@ jobs:
         
         # Create timestamp for unique report folder
         echo "TIMESTAMP=$(date +%Y%m%d_%H%M%S)" >> $GITHUB_ENV
+        
+        # Set up results directory paths
+        mkdir -p ./results/jtl
+        mkdir -p ./results/html
+        mkdir -p ./results/logs
+        echo "RESULTS_DIR=$(pwd)/results" >> $GITHUB_ENV
+    
+    - name: Prepare test runner
+      run: |
+        # Create a simple Java test runner using the core module
+        cat > RunTest.java << 'EOF'
+        import io.ecs.config.TestConfiguration;
+        import io.ecs.config.YamlConfig;
+        import io.ecs.core.PerformanceTest;
+        import io.ecs.engine.Engine;
+        import io.ecs.engine.EngineFactory;
+        import io.ecs.engine.Protocol;
+        import io.ecs.model.ExecutionConfig;
+        import io.ecs.model.TestResult;
+        import io.ecs.report.ReportGenerator;
+        
+        import java.io.File;
+        import java.nio.file.Paths;
+        import java.time.LocalDateTime;
+        import java.time.format.DateTimeFormatter;
+        
+        public class RunTest {
+            public static void main(String[] args) {
+                try {
+                    String configFile = System.getenv("CONFIG_FILE");
+                    String resultsDir = System.getenv("RESULTS_DIR");
+                    String protocol = System.getenv("PROTOCOL");
+                    String engine = System.getenv("ENGINE");
+                    int threads = Integer.parseInt(System.getenv("THREADS"));
+                    int rampUp = Integer.parseInt(System.getenv("RAMP_UP"));
+                    int duration = Integer.parseInt(System.getenv("DURATION"));
+                    
+                    // Load test configuration from specified YAML file
+                    String configPath = "generic-performance-framework-tests/src/test/resources/configs/" + configFile;
+                    File configFileObj = new File(configPath);
+                    if (!configFileObj.exists()) {
+                        System.out.println("Config file not found at: " + configPath);
+                        System.exit(1);
+                    }
+                    
+                    System.out.println("Loading config from: " + configPath);
+                    TestConfiguration config = YamlConfig.fromFile(configPath);
+                    
+                    // Override with workflow parameters
+                    ExecutionConfig execConfig = new ExecutionConfig();
+                    execConfig.setThreads(threads);
+                    execConfig.setRampUpSeconds(rampUp);
+                    execConfig.setDurationSeconds(duration);
+                    
+                    String targetUrl = System.getenv("TARGET_URL");
+                    if (targetUrl != null && !targetUrl.isEmpty()) {
+                        execConfig.setTargetUrl(targetUrl);
+                    }
+                    
+                    // Create performance test with chosen engine
+                    Engine testEngine = EngineFactory.createEngine(config, engine);
+                    if (testEngine == null) {
+                        System.out.println("Failed to create engine: " + engine);
+                        System.exit(1);
+                    }
+                    
+                    // Set up test parameters
+                    PerformanceTest test = new PerformanceTest(config, testEngine);
+                    test.setExecutionConfig(execConfig);
+                    
+                    // Run test and get results
+                    System.out.println("Starting test with engine: " + engine);
+                    TestResult result = test.execute();
+                    
+                    // Generate report
+                    ReportGenerator reporter = new ReportGenerator(result);
+                    String reportPath = resultsDir + "/html/" + protocol + "_" + 
+                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+                    reporter.generateHtmlReport(reportPath);
+                    
+                    // Write JTL file
+                    String jtlPath = resultsDir + "/jtl/" + protocol + "_" + 
+                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+                    reporter.writeJtlFile(jtlPath + "/results.jtl");
+                    
+                    // Print summary
+                    System.out.println("Test completed successfully!");
+                    System.out.println("Total requests: " + result.getTotalRequests());
+                    System.out.println("Errors: " + result.getErrorCount());
+                    System.out.println("Success rate: " + result.getSuccessRate() + "%");
+                    System.out.println("Average response time: " + result.getAverageResponseTime() + "ms");
+                    
+                    System.out.println("Results stored in:");
+                    System.out.println("- JTL: " + jtlPath);
+                    System.out.println("- HTML: " + reportPath);
+                    
+                    System.exit(0);
+                } catch (Exception e) {
+                    System.err.println("Error running test: " + e.getMessage());
+                    e.printStackTrace();
+                    System.exit(1);
+                }
+            }
+        }
+        EOF
+        
+        # Compile with dependencies
+        javac -cp generic-performance-framework-core/target/generic-performance-framework-core-1.0.0.jar:generic-performance-framework-tests/target/generic-performance-framework-tests-1.0.0.jar RunTest.java
     
     - name: Execute performance test
       id: run_test
       run: |
-        # Build command with parameters
-        chmod +x perftest.sh
-        CMD="./perftest.sh run $PROTOCOL --threads=$THREADS --ramp-up=$RAMP_UP --duration=$DURATION"
+        # Build classpath
+        CLASSPATH=$(find generic-performance-framework-core/target -name "*.jar" | tr '\n' ':')
+        CLASSPATH="$CLASSPATH:$(find generic-performance-framework-tests/target -name "*.jar" | tr '\n' ':')"
+        CLASSPATH="$CLASSPATH:."
         
-        # Add additional parameters if provided
+        echo "Running performance test with:"
+        echo "- Engine: $ENGINE"
+        echo "- Protocol: $PROTOCOL"
+        echo "- Threads: $THREADS"
+        echo "- Ramp-up: $RAMP_UP seconds"
+        echo "- Duration: $DURATION seconds"
+        echo "- Config: $CONFIG_FILE"
+        
         if [ -n "$TARGET_URL" ]; then
-          CMD="$CMD --target=$TARGET_URL"
+          echo "- Target URL: $TARGET_URL"
         fi
-        
-        if [ "$ITERATIONS" -gt 0 ]; then
-          CMD="$CMD --iterations=$ITERATIONS"
-        fi
-        
-        if [ -n "$CUSTOM_CONFIG" ]; then
-          CMD="$CMD --config=$CUSTOM_CONFIG"
-        fi
-        
-        if [ "$THRESHOLD_ASSERTIONS" = "true" ]; then
-          CMD="$CMD --assert-thresholds"
-        fi
-        
-        echo "Running command: $CMD"
         
         # Run the test and capture exit code
-        $CMD
-        TEST_EXIT_CODE=$?
+        java -cp "$CLASSPATH" RunTest 2>&1 | tee "$RESULTS_DIR/logs/test-run.log"
+        TEST_EXIT_CODE=${PIPESTATUS[0]}
         
         # Set test result status
         if [ $TEST_EXIT_CODE -eq 0 ]; then
@@ -137,23 +249,22 @@ jobs:
         fi
         
         # Find the most recent results directory for reports
-        JTL_DIR=$(find target/jtl-results -type d -name "${PROTOCOL}_*" | sort | tail -n 1)
-        HTML_DIR=$(find target/html-reports -type d -name "${PROTOCOL}_*" | sort | tail -n 1)
+        JTL_DIR=$(find $RESULTS_DIR/jtl -type d -name "${PROTOCOL}_*" | sort | tail -n 1)
+        HTML_DIR=$(find $RESULTS_DIR/html -type d -name "${PROTOCOL}_*" | sort | tail -n 1)
         
         echo "JTL_DIR=$JTL_DIR" >> $GITHUB_ENV
         echo "HTML_DIR=$HTML_DIR" >> $GITHUB_ENV
         
-        # Extract basic statistics for summary
-        if [ -f "$JTL_DIR/results.jtl" ]; then
-          # Use simple shell commands to extract basic stats from JTL file
-          TOTAL_REQUESTS=$(wc -l < "$JTL_DIR/results.jtl")
-          ERROR_COUNT=$(grep -c "false" "$JTL_DIR/results.jtl" || echo "0")
-          SUCCESS_RATE=$(( 100 - (ERROR_COUNT * 100 / TOTAL_REQUESTS) ))
-          
-          echo "TOTAL_REQUESTS=$TOTAL_REQUESTS" >> $GITHUB_ENV
-          echo "ERROR_COUNT=$ERROR_COUNT" >> $GITHUB_ENV
-          echo "SUCCESS_RATE=$SUCCESS_RATE" >> $GITHUB_ENV
-        fi
+        # Extract basic statistics for summary from log file
+        TOTAL_REQUESTS=$(grep "Total requests:" "$RESULTS_DIR/logs/test-run.log" | awk '{print $3}')
+        ERROR_COUNT=$(grep "Errors:" "$RESULTS_DIR/logs/test-run.log" | awk '{print $2}')
+        SUCCESS_RATE=$(grep "Success rate:" "$RESULTS_DIR/logs/test-run.log" | awk '{print $3}' | sed 's/%//')
+        AVG_RESPONSE=$(grep "Average response time:" "$RESULTS_DIR/logs/test-run.log" | awk '{print $4}' | sed 's/ms//')
+        
+        echo "TOTAL_REQUESTS=$TOTAL_REQUESTS" >> $GITHUB_ENV
+        echo "ERROR_COUNT=$ERROR_COUNT" >> $GITHUB_ENV
+        echo "SUCCESS_RATE=$SUCCESS_RATE" >> $GITHUB_ENV
+        echo "AVG_RESPONSE=$AVG_RESPONSE" >> $GITHUB_ENV
         
         exit $TEST_EXIT_CODE
       continue-on-error: true

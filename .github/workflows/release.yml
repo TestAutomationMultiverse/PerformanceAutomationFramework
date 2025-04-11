@@ -1,54 +1,115 @@
-name: Release
+name: Release Core Module to GitHub Packages
 
 on:
   push:
+    branches: [ main ]
     tags:
-      - 'v*.*.*'
+      - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version'
-        required: true
-        default: '1.0.0'
 
 jobs:
-  build:
+  build-and-publish-core:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
     steps:
-    - uses: actions/checkout@v4
+    - name: Check out the repo
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v3
       with:
-        fetch-depth: 0
-    
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
         cache: maven
-        server-id: github
-    
-    - name: Set version from tag
-      if: github.event_name == 'push'
-      run: echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-      
-    - name: Set version from input
-      if: github.event_name == 'workflow_dispatch'
-      run: echo "RELEASE_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-      
-    - name: Build with Maven
-      run: mvn -B clean package -DskipTests
-    
-    - name: Run tests
-      run: mvn test
-      
-    - name: Create Release
-      id: create_release
-      uses: softprops/action-gh-release@v2
+
+    - name: Set up Maven settings.xml for GitHub Packages
+      uses: s4u/maven-settings-action@v2.8.0
+      with:
+        servers: |
+          [{
+            "id": "github",
+            "username": "${{ github.actor }}",
+            "password": "${{ secrets.GITHUB_TOKEN }}"
+          }]
+        properties: |
+          [
+            {
+              "property": "maven.compiler.source",
+              "value": "21"
+            },
+            {
+              "property": "maven.compiler.target", 
+              "value": "21"
+            }
+          ]
+
+    - name: Build Core Module
+      run: |
+        mvn -B clean package --file generic-performance-framework-core/pom.xml -DskipTests
+        ls -la generic-performance-framework-core/target/
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Generate Javadoc for Core Module
+      run: |
+        mvn javadoc:jar --file generic-performance-framework-core/pom.xml
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Publish Core Package to GitHub Packages
+      run: |
+        mvn -B deploy --file generic-performance-framework-core/pom.xml -DskipTests
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Core Artifacts
+      uses: actions/upload-artifact@v3
       with:
-        tag_name: v${{ env.RELEASE_VERSION }}
-        name: Release v${{ env.RELEASE_VERSION }}
-        draft: false
-        prerelease: false
-        files: ./target/jmeter-dsl-performance-framework-${{ env.RELEASE_VERSION }}.jar
+        name: generic-performance-framework-core-artifacts
+        path: |
+          generic-performance-framework-core/target/*.jar
+          generic-performance-framework-core/target/*.pom
+
+    - name: Create GitHub Release with Core JAR Files
+      if: startsWith(github.ref, 'refs/tags/')
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          generic-performance-framework-core/target/generic-performance-framework-core-*.jar
+          !generic-performance-framework-core/target/generic-performance-framework-core-*-javadoc.jar
+          !generic-performance-framework-core/target/generic-performance-framework-core-*-sources.jar
+        generate_release_notes: true
+        name: Generic Performance Framework Core ${{ github.ref_name }}
+        body: |
+          # Generic Performance Framework Core Release ${{ github.ref_name }}
+          
+          A comprehensive framework for performance testing with support for JMeter and Gatling.
+          
+          ## Maven Dependency
+          
+          ```xml
+          <dependency>
+            <groupId>io.ecs</groupId>
+            <artifactId>generic-performance-framework-core</artifactId>
+            <version>${{ github.ref_name }}</version>
+          </dependency>
+          ```
+          
+          ### Repository Configuration
+          
+          Add this to your `pom.xml`:
+          
+          ```xml
+          <repositories>
+            <repository>
+              <id>github</id>
+              <url>https://maven.pkg.github.com/TestAutomationMultiverse/GenericPerformanceFramework</url>
+            </repository>
+          </repositories>
+          ```
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
